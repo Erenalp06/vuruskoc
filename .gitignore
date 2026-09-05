@@ -1,0 +1,79 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Large video files
+input_videos/*.mp4
+input_videos/*.avi
+input_videos/*.mov
+output_videos/*.mp4
+output_videos/*.avi
+*.mp4
+!data/pros/*.json
+
+# Model weights (download separately)
+models/*.pt
+models/*.pth
+models/*.onnx
+*.pt
+*.pth
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# Training data images (too large for git, download separately)
+training/tennis-ball-detection-6/tennis-ball-detection-6/
+
+# Env
+.env
+venv/
+data/models/*.task
+
+# calibration workspace (local only)
+data/thetis/
+data/thetis_src/
+calibration*.csv
+
+# app runtime
+storage/
+server/swingforge-server
+web/node_modules/
+web/dist/
+.env
+
+# stray logs
+*.log
+server/server
+
+web/dev-dist/
+
+# generated / downloaded (see web/scripts/prepare-assets.mjs)
+web/public/mediapipe/
+web/public/models/
+web/*.zip
+
+# ── never commit: media, datasets, build artifacts ──
+input_videos/
+output_videos/
+data/thetis/
+data/thetis_src/
+*.mov
+*.MOV
+*.mp4
+*.MP4
+*.avi
+*.mkv
+*.webm
+calibration*.csv
+server/swingforge-server
+server/vuruskoc-server
+web/*.zip

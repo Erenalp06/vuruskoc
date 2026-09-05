@@ -1,0 +1,35 @@
+VuruşKoç
+Copyright (C) 2026 VuruşKoç contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU Affero General Public License as published by the Free
+Software Foundation, either version 3 of the License, or (at your option) any
+later version. See the LICENSE file for the full text.
+
+--------------------------------------------------------------------------------
+Upstream / third-party
+--------------------------------------------------------------------------------
+
+VuruşKoç began as a fork of and still contains code from:
+
+  SwingForge AI — https://github.com/SinbadSails/SwingForge
+    MIT License. The tennis-swing scoring/coaching core (core/*.py) and the
+    Gradio UI originate here and remain available under MIT from that project.
+
+  tennis_analysis — https://github.com/abdullahtarek/tennis_analysis
+    SwingForge is in turn built on this project (YOLO player/ball detection,
+    court keypoint detection, video pipeline). Those modules (trackers/,
+    court_line_detector/, mini_court/, pipeline.py, yolo_inference.py) are
+    legacy and unused by the shipped on-device app.
+
+Bundled models / data:
+  * MediaPipe Pose Landmarker (pose_landmarker_lite.task) — Google, Apache-2.0.
+  * data/pros/*.json — pose keypoints extracted with MediaPipe from publicly
+    available slow-motion coaching / practice footage, used for reference only.
+
+Runtime dependencies keep their own licenses (React — MIT, @mediapipe/tasks-vision
+— Apache-2.0, Inter & Space Grotesk fonts — SIL OFL 1.1, etc.).
+
+The combined work is distributed under the AGPL-3.0-or-later. Files that carry an
+upstream MIT copyright keep that notice; the license of the whole does not
+diminish the rights you have to the upstream projects from their own repos.

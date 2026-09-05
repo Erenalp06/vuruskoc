@@ -1,0 +1,31 @@
+{
+  "name": "vuruskoc-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm run prepare-assets && vite",
+    "prepare-assets": "node scripts/prepare-assets.mjs",
+    "prebuild": "npm run prepare-assets",
+    "build": "cross-env NODE_OPTIONS=--experimental-global-webcrypto vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/space-grotesk": "^5.3.0",
+    "@mediapipe/tasks-vision": "^1.0.1",
+    "idb-keyval": "^6.3.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^4.3.4",
+    "cross-env": "^7.0.3",
+    "sharp": "^0.33.5",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11",
+    "vite-plugin-pwa": "^0.21.2"
+  }
+}
