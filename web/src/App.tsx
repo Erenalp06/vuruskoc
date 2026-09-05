@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trimmer } from "./Trimmer";
+import { BgDecor } from "./BgDecor";
 import { ResultView } from "./ResultView";
 import {
   analyzeVideo, renderAnnotated, probeVideo, stripResult,
@@ -298,6 +299,7 @@ export function App() {
 
   return (
     <div className="app">
+      <BgDecor />
       <div className="top">
         <div className="brand">
           <span className="mark" aria-hidden>

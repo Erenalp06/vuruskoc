@@ -39,6 +39,14 @@ body::before {
 }
 #root { position: relative; z-index: 1; }
 
+.bg-decor { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.bg-decor svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bg-decor .court { fill: none; stroke: var(--accent); stroke-width: 2; opacity: 0.05; }
+.bg-decor .ball { fill: none; stroke: #cfe8ff; stroke-width: 3; opacity: 0.04; }
+.bg-decor .arc { fill: none; stroke: var(--accent); stroke-width: 2; opacity: 0.1; }
+.bg-decor .arc-dot { fill: var(--accent); opacity: 0.14; }
+@media (max-width: 720px) { .bg-decor .arc, .bg-decor .arc-dot { display: none; } }
+
 h1, h2, h3 {
   margin: 0; font-weight: 600;
   font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
