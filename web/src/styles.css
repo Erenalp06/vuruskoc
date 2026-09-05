@@ -57,7 +57,14 @@ a { color: var(--accent); }
 
 .app { max-width: 1280px; margin: 0 auto; padding: 30px 26px 80px; }
 
-.top { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+.top {
+  display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px;
+  align-items: center; margin-bottom: 24px;
+}
+.top .top-action { justify-self: end; }
+@media (max-width: 920px) {
+  .top { grid-template-columns: 1fr auto; }
+}
 .brand {
   font-family: "Space Grotesk", sans-serif; font-size: 21px; font-weight: 700;
   letter-spacing: -0.03em; display: flex; align-items: center; gap: 10px;

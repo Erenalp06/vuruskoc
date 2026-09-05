@@ -138,7 +138,7 @@ export function ResultView({ result, keypoints, annotatedUrl, onBack }: {
 
   return (
     <div className="result-stack">
-      <button className="btn ghost sm" onClick={onBack}>← geri</button>
+      <button className="btn ghost sm" onClick={onBack}>← Geri</button>
 
       <div className="card active" style={{ marginTop: 12 }}>
         <div className="result-hero">

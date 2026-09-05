@@ -310,7 +310,9 @@ export function App() {
           <span className="brand-text">Vuruş<span>Koç</span></span>
           <span className="tag">cihazında çalışır · video yüklenmez</span>
         </div>
-        {(srcUrl || view) && <button className="btn sm" style={{ marginLeft: "auto" }} onClick={reset}>+ yeni analiz</button>}
+        <div className="top-action">
+          {(srcUrl || view) && <button className="btn sm" onClick={reset}>+ Yeni analiz</button>}
+        </div>
       </div>
 
       <div className="layout">
