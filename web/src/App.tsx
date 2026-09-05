@@ -231,6 +231,13 @@ export function App() {
 
   const pickFile = async (file: File) => {
     setErr(null); setView(null);
+    if (/\.(avi|mkv|wmv|flv|mpg|mpeg|m2ts|ts)$/i.test(file.name)) {
+      setErr(
+        `“${file.name}” tarayıcıda oynatılamaz (AVI/MKV/WMV desteklenmez). ` +
+        `MP4, MOV ya da WebM'e dönüştür (HandBrake, VLC) veya telefonla yeniden çek.`
+      );
+      return;
+    }
     const url = URL.createObjectURL(file);
     urlsToRevoke.current.push(url);
     try {
@@ -334,6 +341,7 @@ export function App() {
                 <span className="ic">🎾</span>
                 <span className="big">Videoyu buraya bırak ya da <b>seç</b></span>
                 <div style={{ fontSize: 12, marginTop: 6 }}>video cihazından çıkmaz — analiz tarayıcıda yapılır</div>
+                <div style={{ fontSize: 11, marginTop: 4, color: "var(--dim)" }}>MP4 · MOV · WebM (telefon videosu sorunsuz) · AVI/MKV desteklenmez</div>
               </label>
             </div>
           )}

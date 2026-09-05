@@ -9,7 +9,7 @@ import {
   bestLoadingAngles, followThroughComplete, type Phase, type Side, type Stroke, type LoadingAngles,
 } from "./swing";
 import {
-  scoreSwing, topCorrections, generateReport, injuryWarnings, strokeName,
+  scoreSwing, topCorrections, generateReport, swingSummary, injuryWarnings, strokeName,
   type Scores, type Correction, type Lang,
 } from "./coaching";
 
@@ -38,6 +38,7 @@ export type AnalyzeResult = {
   scores: Scores | null;
   swing_score: number | null;
   corrections: Correction[];
+  summary: string;
   report: string;
   injury_warnings: string[];
   phase_counts: Record<string, number>;
@@ -94,6 +95,7 @@ export async function analyzeVideo(url: string, start: number, end: number, opts
   const scores = scoreSwing(contactAngles, strokeType, follow, loadingAngles);
   const report = generateReport(scores, contactAngles, strokeType, loadingAngles, lang);
   const corrections = topCorrections(scores, contactAngles, strokeType, loadingAngles, lang, 2);
+  const summary = swingSummary(scores, contactAngles, strokeType, loadingAngles, lang);
   const merged = { ...(contactAngles ?? {}), ...(loadingAngles ?? {}) };
   const warnings = injuryWarnings(merged, strokeType, lang);
 
@@ -118,6 +120,7 @@ export async function analyzeVideo(url: string, start: number, end: number, opts
     scores,
     swing_score: scores ? Math.round(scores.overall * 10) / 10 : null,
     corrections,
+    summary,
     report,
     injury_warnings: warnings,
     phase_counts: phaseCounts,

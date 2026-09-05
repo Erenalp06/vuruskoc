@@ -32,16 +32,23 @@ function FixCard({ stroke, c, n }: { stroke: string; c: Correction; n: number })
     <div className="fix" style={{ borderTopColor: color }}>
       <video className="ref-clip" src={drillURL(stroke, c.metric)} autoPlay loop muted playsInline />
       <div className="fix-body">
-        <span className="fix-num">DÜZELTME {n} · {c.phase === "loading" ? "hazırlık" : "vuruş anı"}</span>
+        <span className="fix-num">
+          {c.combo ? "ANA SORUN" : `DÜZELTME ${n}`} · {c.phase === "loading" ? "hazırlık" : "vuruş anı"}
+        </span>
         <div className="fix-headline">{c.headline || c.name}</div>
         <div className="fix-why">{c.why}</div>
-        <div className="fix-bar">
-          <div className="fix-bar-track">
-            <span className="good-band" style={{ left: pos(lo), width: `${((hi - lo) / 180) * 100}%` }} />
-            <span className="me" style={{ left: pos(c.value) }}><i /><b>sen {c.value.toFixed(0)}°</b></span>
+        {!c.combo && (
+          <div className="fix-bar">
+            <div className="fix-bar-track">
+              <span className="good-band" style={{ left: pos(lo), width: `${((hi - lo) / 180) * 100}%` }} />
+              <span className="me" style={{ left: pos(c.value) }}><i /><b>sen {c.value.toFixed(0)}°</b></span>
+            </div>
+            <div className="fix-legend">
+              hedef <b>{lo}–{hi}°</b> — {c.target_dir === "up" ? "değeri artır" : "değeri azalt"}
+              {c.severity && <span style={{ color, marginLeft: 6 }}>· {c.value.toFixed(0)}° {c.severity === "major" ? "çok" : c.severity === "moderate" ? "belirgin" : "hafif"} dışında</span>}
+            </div>
           </div>
-          <div className="fix-legend">hedef <b>{lo}–{hi}°</b> — {c.target_dir === "up" ? "değeri artır" : "değeri azalt"}</div>
-        </div>
+        )}
         <div className="fix-drill"><span>Alıştırma · </span>{c.drill}</div>
       </div>
     </div>
@@ -155,7 +162,7 @@ export function ResultView({ result, keypoints, annotatedUrl, onBack }: {
           </div>
           <div className="hero-right">
             <span className="hero-pill">▹ {perfPill(score)}</span>
-            <p className="hero-note">{verdictNote(score)}</p>
+            <p className="hero-note">{("summary" in r && r.summary) ? r.summary : verdictNote(score)}</p>
           </div>
         </div>
       </div>

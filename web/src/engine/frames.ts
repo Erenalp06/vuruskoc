@@ -19,7 +19,11 @@ export async function loadVideo(url: string): Promise<HTMLVideoElement> {
   v.preload = "auto";
   await new Promise<void>((res, rej) => {
     v.onloadedmetadata = () => res();
-    v.onerror = () => rej(new Error("video yüklenemedi"));
+    v.onerror = () =>
+      rej(new Error(
+        "Bu video tarayıcıda açılamadı. Desteklenen formatlar: MP4 / MOV / WebM (H.264 en uyumlu). " +
+        "AVI, MKV, WMV gibi formatlar tarayıcıda oynatılamaz — telefonla çekilen video genelde sorunsuz çalışır."
+      ));
   });
   return v;
 }

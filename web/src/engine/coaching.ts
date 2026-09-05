@@ -152,11 +152,139 @@ export function scoreSwing(
   return { ...scores, overall: Math.round(overall * 10) / 10 } as Scores;
 }
 
+export type Severity = "slight" | "moderate" | "major";
+
 export type Correction = {
   metric: Metric; name: string; headline: string; why: string;
   phase: "contact" | "loading"; value: number; ideal: [number, number];
   target_dir: "up" | "down"; score: number; direction: "low" | "high"; drill: string;
+  severity?: Severity; combo?: boolean; clipMetric?: Metric;
 };
+
+type MCtx = {
+  metric: Metric; value: number; score: number; lo: number; hi: number;
+  direction: "low" | "high"; out: number; severity: Severity;
+};
+
+const SEV = (out: number): Severity => (out <= 10 ? "slight" : out <= 25 ? "moderate" : "major");
+const SEV_LABEL: Record<Lang, Record<Severity, string>> = {
+  tr: { slight: "hafif dışında", moderate: "belirgin dışında", major: "çok dışında" },
+  en: { slight: "slightly off", moderate: "clearly off", major: "way off" },
+};
+
+function metricContext(
+  scores: Scores, contact: Angles, stroke: Stroke, loading: LoadingAngles | null
+): { ctx: Partial<Record<Metric, MCtx>>; merged: Record<string, number> } {
+  const merged: any = { ...contact };
+  for (const m of ["shoulder_angle", "knee_angle", "racket_lag"] as const) {
+    if (loading && (loading as any)[m] != null) merged[m] = (loading as any)[m];
+  }
+  const ideals = IDEAL_RANGES[stroke] ?? IDEAL_RANGES.forehand;
+  const ctx: Partial<Record<Metric, MCtx>> = {};
+  for (const m of ["elbow_angle", "hip_rotation", "shoulder_angle", "knee_angle", "racket_lag"] as Metric[]) {
+    const sc = scores[m];
+    if (sc == null || merged[m] == null || !ideals[m]) continue;
+    const [lo, hi] = ideals[m];
+    const v = merged[m];
+    const out = v < lo ? lo - v : v > hi ? v - hi : 0;
+    ctx[m] = {
+      metric: m, value: Math.round(v * 10) / 10, score: Math.round(sc * 10) / 10,
+      lo, hi, direction: v < lo ? "low" : "high", out: Math.round(out * 10) / 10, severity: SEV(out),
+    };
+  }
+  return { ctx, merged };
+}
+
+// ── combination rules: fire when a meaningful pattern of metrics co-occurs ──
+type Combo = {
+  id: string; clip: Metric; covers: Metric[]; prio: number;
+  when: (c: Partial<Record<Metric, MCtx>>, x: { stroke: Stroke; follow: boolean }) => boolean;
+  tr: { headline: string; why: string; drill: string };
+  en: { headline: string; why: string; drill: string };
+};
+const bad = (c: MCtx | undefined, dir?: "low" | "high") => !!c && c.out > 0 && (!dir || c.direction === dir);
+
+const COMBOS: Combo[] = [
+  {
+    id: "low_trophy", clip: "shoulder_angle", covers: ["shoulder_angle"], prio: 6,
+    when: (c, x) => x.stroke === "serve" && bad(c.shoulder_angle, "low"),
+    tr: { headline: "Trophy pozisyonu düşük", why: "Servis omzun yeterince açılmıyor — topu yükseğe alamıyor, gücü yukarı yönlendiremiyorsun.",
+          drill: "Atış kolunu yukarı uzat, vuruş omzunu tam aç, temasa en yüksek noktada git. 15 tekrar." },
+    en: { headline: "Low trophy position", why: "Your serving shoulder doesn't open enough — you can't get the ball high or drive up through it.",
+          drill: "Reach the toss arm high, open the hitting shoulder fully, contact at the peak. 15 reps." },
+  },
+  {
+    id: "no_unit_turn", clip: "shoulder_angle", covers: ["shoulder_angle", "hip_rotation"], prio: 5,
+    when: (c) => bad(c.shoulder_angle, "low") && bad(c.hip_rotation, "low"),
+    tr: { headline: "Unit turn yok", why: "Omuz ve kalça dönmüyor — topu ağırlıkla kolunla karşılıyorsun, güç zayıf kalıyor.",
+          drill: "Hazırlıkta omuz + kalçayı tek parça geriye çevir, kol pasif kalsın. 15 yavaş gölge vuruş." },
+    en: { headline: "No unit turn", why: "Shoulders and hips don't rotate — you're arming the ball, so there's little power.",
+          drill: "Turn shoulders and hips back as one unit; keep the arm passive. 15 slow shadow swings." },
+  },
+  {
+    id: "rushing", clip: "racket_lag", covers: ["elbow_angle", "racket_lag"], prio: 5,
+    when: (c) => bad(c.elbow_angle, "high") && bad(c.racket_lag, "low"),
+    tr: { headline: "Aceleci sallıyorsun", why: "Raket kafası elinin önüne geçmiş, gövde geride — itiyorsun, kamçılamıyorsun.",
+          drill: "Backswing'i tamamla, sonra rakete izin ver. 'Garson tepsisi' pozisyonundan bırak. 20 tekrar." },
+    en: { headline: "You're rushing the swing", why: "The racket head is ahead of your hand and the body lags — you're pushing, not whipping.",
+          drill: "Finish the backswing, then let the racket go. 20 reps from the 'waiter's tray'." },
+  },
+  {
+    id: "loaded_not_released", clip: "hip_rotation", covers: ["knee_angle", "hip_rotation"], prio: 4,
+    when: (c) => bad(c.knee_angle, "low") && bad(c.hip_rotation, "low"),
+    tr: { headline: "Yüklendin ama açılmadın", why: "Bacakta çökme var, dönüşe geçmiyor — depoladığın gücü boşaltmıyorsun.",
+          drill: "Bacaktan kalçaya, kalçadan gövdeye zincirle: split-step → çök → dön → vur. 20 tekrar." },
+    en: { headline: "Loaded but never released", why: "You sink into the knees but don't uncoil — the stored energy stays stored.",
+          drill: "Chain it: split-step → sink → rotate → hit. 20 reps." },
+  },
+  {
+    id: "over_the_top", clip: "racket_lag", covers: ["racket_lag", "elbow_angle"], prio: 4,
+    when: (c) => bad(c.racket_lag, "high") && bad(c.elbow_angle, "low"),
+    tr: { headline: "Backswing çok büyük", why: "Raket çok geride, kol katlanmış — kontrol gidiyor, zamanlaması zorlaşıyor.",
+          drill: "Kompakt hazırlık: raketi bel hizasında tut, dirseği gövdeden uzaklaştırma. 20 tekrar." },
+    en: { headline: "Backswing too big", why: "Racket way behind, arm folded — control drops and timing gets hard.",
+          drill: "Compact take-back: racket at waist height, elbow close to the body. 20 reps." },
+  },
+  {
+    id: "standing_tall", clip: "knee_angle", covers: ["knee_angle", "hip_rotation"], prio: 3,
+    when: (c) => bad(c.knee_angle, "high") && bad(c.hip_rotation, "low"),
+    tr: { headline: "Dik duruyorsun, dönüş de yok", why: "Ne diz bükümü ne rotasyon var — güç zincirinin ilk iki halkası eksik.",
+          drill: "Split-step'ten hafif çök, aynı anda gövdeyi çevir. 20 split-step → dönüş." },
+    en: { headline: "Standing tall, no rotation", why: "Neither knee bend nor rotation — the first two links of the power chain are missing.",
+          drill: "From the split-step, sink slightly and rotate at the same time. 20 reps." },
+  },
+  {
+    id: "cut_short", clip: "racket_lag", covers: [], prio: 3,
+    when: (c, x) => !x.follow && (c.racket_lag?.score ?? 0) >= 65 && (c.racket_lag?.out ?? 99) === 0,
+    tr: { headline: "Vuruşu kesiyorsun", why: "Hızlanman iyi ama temasta duruyorsun — topun içinden geçmiyorsun, topspin ve kontrol kaçıyor.",
+          drill: "Topun içinden geç, raketi karşı omzunun üstünde bitir. 20 gölge vuruş." },
+    en: { headline: "You cut the swing short", why: "Good acceleration, but you stop at contact — no follow-through means less spin and control.",
+          drill: "Swing through the ball, finish over the opposite shoulder. 20 shadow swings." },
+  },
+];
+
+function pickCombo(
+  ctx: Partial<Record<Metric, MCtx>>, stroke: Stroke, follow: boolean, lang: Lang
+): Correction | null {
+  const hit = COMBOS
+    .filter((k) => k.when(ctx, { stroke, follow }))
+    .sort((a, b) => b.prio - a.prio)[0];
+  if (!hit) return null;
+  const base = ctx[hit.clip];
+  const t = hit[lang];
+  return {
+    metric: hit.clip, clipMetric: hit.clip, combo: true,
+    name: I18N[lang].metric_names[hit.clip],
+    headline: t.headline, why: t.why, drill: t.drill,
+    phase: METRIC_PHASE[hit.clip],
+    value: base?.value ?? 0, ideal: base ? [base.lo, base.hi] : [0, 0],
+    target_dir: base?.direction === "high" ? "down" : "up",
+    score: base?.score ?? 0, direction: base?.direction ?? "low",
+    severity: base?.severity,
+    // stash covers for the caller
+    ...( { _covers: hit.covers } as object ),
+  } as Correction;
+}
 
 export function topCorrections(
   scores: Scores | null, contact: Angles | null, stroke: Stroke,
@@ -164,35 +292,66 @@ export function topCorrections(
 ): Correction[] {
   if (!scores || !contact) return [];
   const L = I18N[lang];
-  const merged: any = { ...contact };
-  for (const m of ["shoulder_angle", "knee_angle", "racket_lag"] as const) {
-    if (loading && (loading as any)[m] != null) merged[m] = (loading as any)[m];
-  }
-  const ideals = IDEAL_RANGES[stroke] ?? IDEAL_RANGES.forehand;
+  const { ctx } = metricContext(scores, contact, stroke, loading);
+  const follow = (scores.follow_through ?? 100) >= 50;
 
-  const ranked = (["elbow_angle", "hip_rotation", "shoulder_angle", "knee_angle", "racket_lag"] as Metric[])
-    .flatMap((m) => {
-      const sc = scores[m];
-      if (sc == null || merged[m] == null || !ideals[m]) return [];
-      const [lo, hi] = ideals[m];
-      const val = merged[m];
-      if ((lo <= val && val <= hi) || sc >= 82) return [];
-      const direction: "low" | "high" = val < lo ? "low" : "high";
-      const pl = L.plain[m][direction];
-      const dir = direction === "low" ? "too_low" : "too_high";
-      return [{
-        metric: m, name: L.metric_names[m], headline: pl.headline, why: pl.why,
-        phase: METRIC_PHASE[m], value: Math.round(val * 10) / 10, ideal: [lo, hi] as [number, number],
-        target_dir: (direction === "low" ? "up" : "down") as "up" | "down",
-        score: Math.round(sc * 10) / 10, direction,
-        drill: L.drills[m]?.[dir] ?? L.drills.default,
-        impact: (WEIGHTS[m] ?? 0.1) * (100 - sc),
-      }];
+  const out: Correction[] = [];
+  const combo = pickCombo(ctx, stroke, follow, lang);
+  const covered = new Set<Metric>(combo ? ((combo as any)._covers as Metric[]) : []);
+  if (combo) {
+    delete (combo as any)._covers;
+    out.push(combo);
+  }
+
+  const singles = (["elbow_angle", "hip_rotation", "shoulder_angle", "knee_angle", "racket_lag"] as Metric[])
+    .map((m) => ctx[m])
+    .filter((c): c is MCtx => !!c && c.out > 0 && c.score < 82 && !covered.has(c.metric))
+    .map((c) => {
+      const dir = c.direction === "low" ? "too_low" : "too_high";
+      const pl = L.plain[c.metric][c.direction];
+      return {
+        metric: c.metric, name: L.metric_names[c.metric], headline: pl.headline, why: pl.why,
+        phase: METRIC_PHASE[c.metric], value: c.value, ideal: [c.lo, c.hi] as [number, number],
+        target_dir: (c.direction === "low" ? "up" : "down") as "up" | "down",
+        score: c.score, direction: c.direction, severity: c.severity,
+        drill: L.drills[c.metric]?.[dir] ?? L.drills.default,
+        impact: (WEIGHTS[c.metric] ?? 0.1) * (100 - c.score),
+      };
     })
     .sort((a, b) => b.impact - a.impact)
-    .slice(0, top);
+    .map(({ impact, ...c }) => c);
 
-  return ranked.map(({ impact, ...c }) => c);
+  return out.concat(singles).slice(0, Math.max(top, out.length + 1));
+}
+
+/** Data-driven one/two-liner for the hero: the point that matters most + the strongest link. */
+export function swingSummary(
+  scores: Scores | null, contact: Angles | null, stroke: Stroke,
+  loading: LoadingAngles | null, lang: Lang
+): string {
+  if (!scores || !contact) return "";
+  const { ctx } = metricContext(scores, contact, stroke, loading);
+  const list = Object.values(ctx) as MCtx[];
+  if (!list.length) return "";
+  const tr = lang === "tr";
+
+  const worst = list
+    .filter((c) => c.out > 0 && c.score < 82)
+    .sort((a, b) => (WEIGHTS[b.metric] ?? 0.1) * (100 - b.score) - (WEIGHTS[a.metric] ?? 0.1) * (100 - a.score))[0];
+  const best = [...list].sort((a, b) => b.score - a.score)[0];
+  const bn = I18N[lang].metric_names[best.metric].toLowerCase();
+
+  if (!worst) {
+    return tr
+      ? `Belirgin bir zayıflık yok — ölçülen açıların hepsi ideal aralıkta. En güçlü yanın: ${bn}.`
+      : `No clear weakness — every measured angle is in the ideal band. Strongest link: ${bn}.`;
+  }
+  const wn = I18N[lang].metric_names[worst.metric];
+  const why = I18N[lang].plain[worst.metric][worst.direction].why;
+  const sev = SEV_LABEL[lang][worst.severity];
+  return tr
+    ? `En çok fark yaratacak nokta: ${wn} — ${worst.value}°, hedef ${worst.lo}–${worst.hi}° (${sev}). ${why} En güçlü yanın: ${bn}.`
+    : `Biggest opportunity: ${wn} — ${worst.value}°, target ${worst.lo}–${worst.hi}° (${sev}). ${why} Strongest link: ${bn}.`;
 }
 
 export function generateReport(
