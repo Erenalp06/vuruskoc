@@ -8,6 +8,8 @@ karşılaştırması — hepsi tarayıcıda, sunucusuz, çevrimdışı çalışa
 
 Canlı: **https://ai.vuruskoc.com**
 
+![VuruşKoç — analiz sonucu ekranı](docs/result.png)
+
 ---
 
 ## Nasıl çalışıyor
