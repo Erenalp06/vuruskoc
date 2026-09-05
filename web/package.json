@@ -6,7 +6,7 @@
     "dev": "npm run prepare-assets && vite",
     "prepare-assets": "node scripts/prepare-assets.mjs",
     "prebuild": "npm run prepare-assets",
-    "build": "cross-env NODE_OPTIONS=--experimental-global-webcrypto vite build",
+    "build": "cross-env NODE_OPTIONS=--require=./scripts/crypto-polyfill.cjs vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit"
   },
