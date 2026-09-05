@@ -269,7 +269,9 @@ video { width: 100%; border-radius: 12px; background: #000; display: block; }
   font-family: "Space Grotesk", sans-serif; font-size: 12px; letter-spacing: 0.14em;
   text-transform: uppercase; color: var(--muted);
 }
-.hist { position: sticky; top: 16px; max-height: calc(100vh - 40px); overflow-y: auto; }
+.hist { max-height: 62vh; overflow-y: auto; }
+.sidebar { position: sticky; top: 16px; }
+@media (max-width: 920px) { .sidebar { position: static; } }
 .hist-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .hist-group + .hist-group { margin-top: 10px; }
 .hist-day {

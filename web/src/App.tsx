@@ -137,7 +137,7 @@ function History({ items, onOpen, onDelete }: {
   }, [items]);
 
   return (
-    <div>
+    <div className="sidebar">
       <div className="card hist" onClick={() => setMenu(null)}>
         <div className="hist-head"><div className="side-title">⟳ Geçmiş</div></div>
         {items.length === 0 && <p className="muted" style={{ fontSize: 12 }}>henüz analiz yok</p>}
