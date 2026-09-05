@@ -77,3 +77,7 @@ calibration*.csv
 server/swingforge-server
 server/vuruskoc-server
 web/*.zip
+
+# but DO keep the bundled drill reference clips
+!web/public/drills/
+!web/public/drills/*.mp4
