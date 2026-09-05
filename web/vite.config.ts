@@ -36,7 +36,7 @@ export default defineConfig({
             urlPattern: ({ url }) => /\/(models|mediapipe|drills)\//.test(url.pathname),
             handler: "CacheFirst",
             options: {
-              cacheName: "vk-engine-assets",
+              cacheName: "vk-engine-assets-2",
               expiration: { maxEntries: 40, maxAgeSeconds: 60 * 60 * 24 * 90 },
               cacheableResponse: { statuses: [0, 200] },
               rangeRequests: true,
