@@ -315,9 +315,10 @@ export function App() {
         </div>
       </div>
 
+      <Stepper step={step} />
+
       <div className="layout">
         <div>
-          <Stepper step={step} />
           {err && <div className="card"><p className="err">{err}</p></div>}
 
           {step === 1 && (
