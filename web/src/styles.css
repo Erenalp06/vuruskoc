@@ -371,6 +371,11 @@ video { width: 100%; border-radius: 12px; background: #000; display: block; }
   margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line-soft);
   font-size: 11px; color: var(--dim); text-align: center; letter-spacing: 0.02em;
 }
+
+.clip-ctl { display: flex; align-items: center; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+.clip-lbl { font-size: 11px; color: var(--dim); margin-right: 2px; }
+.clip-ctl .btn.sm { padding: 5px 10px; }
+.clip-ctl .btn.ghost.sm.on { background: var(--accent); color: #12200a; border-color: transparent; font-weight: 700; }
 .ring {
   flex: none; width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center;
   transition: background 0.8s ease;

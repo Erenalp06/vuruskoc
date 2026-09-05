@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   GHOST_PROS, renderProOverlay, drillURL, recommendDrills,
   type AnalyzeResult, type Correction, type Drill, type Keypoints, type StoredResult,
@@ -23,6 +23,37 @@ const verdictNote = (s: number) =>
   : s >= 50 ? "Doğru yoldasın. Birkaç önemli noktayı toparlaman gerekiyor."
   : "Mekaniğin baştan kurulması gerekiyor — ilk iki düzeltme en çok fark yaratır.";
 const perfPill = (s: number) => (s >= 85 ? "Harika performans!" : s >= 70 ? "İyi gidiyor" : s >= 50 ? "Gelişmeye açık" : "Çalışma zamanı");
+
+const SPEEDS = [1, 0.5, 0.25] as const;
+
+function ClipPlayer({ src, fps = 24 }: { src: string; fps?: number }) {
+  const ref = useRef<HTMLVideoElement>(null);
+  const [rate, setRate] = useState<number>(1);
+  const setSpeed = (r: number) => { setRate(r); if (ref.current) ref.current.playbackRate = r; };
+  const step = (dir: 1 | -1) => {
+    const v = ref.current;
+    if (!v) return;
+    v.pause();
+    v.currentTime = Math.max(0, Math.min(v.duration || 0, v.currentTime + dir / fps));
+  };
+  return (
+    <div>
+      <video ref={ref} src={src} controls loop muted playsInline
+        onLoadedMetadata={() => { if (ref.current) ref.current.playbackRate = rate; }} />
+      <div className="clip-ctl">
+        <span className="clip-lbl">hız</span>
+        {SPEEDS.map((s) => (
+          <button key={s} className={"btn ghost sm" + (rate === s ? " on" : "")} onClick={() => setSpeed(s)}>
+            {s === 1 ? "1×" : s === 0.5 ? "½×" : "¼×"}
+          </button>
+        ))}
+        <span style={{ flex: 1 }} />
+        <button className="btn ghost sm" onClick={() => step(-1)}>‹ kare</button>
+        <button className="btn ghost sm" onClick={() => step(1)}>kare ›</button>
+      </div>
+    </div>
+  );
+}
 
 function FixCard({ stroke, c, n }: { stroke: string; c: Correction; n: number }) {
   const color = col(c.score);
@@ -163,7 +194,7 @@ function ProCompare({ result, keypoints }: { result: StoredResult | AnalyzeResul
         <button className="btn sm" onClick={run} disabled={busy}>{busy ? "hazırlanıyor…" : "Karşılaştır"}</button>
       </div>
       {err && <p className="err" style={{ fontSize: 12, marginTop: 8 }}>{err}</p>}
-      {url && <video key={url} src={url} controls autoPlay loop muted playsInline style={{ marginTop: 12 }} />}
+      {url && <div style={{ marginTop: 12 }}><ClipPlayer src={url} fps={20} /></div>}
     </div>
   );
 }
@@ -255,7 +286,7 @@ export function ResultView({ result, keypoints, annotatedUrl, onBack }: {
         {annotatedUrl && (
           <div className="card">
             <h3>İşaretli video</h3>
-            <video src={annotatedUrl} controls loop muted playsInline />
+            <ClipPlayer src={annotatedUrl} />
           </div>
         )}
         <ProCompare result={result} keypoints={keypoints} />
