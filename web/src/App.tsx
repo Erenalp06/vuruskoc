@@ -385,6 +385,11 @@ export function App() {
         <History items={history} onOpen={openHistory} onDelete={removeEntry} />
       </div>
 
+      <div className="app-footer">
+        VuruşKoç v{__APP_VERSION__}{__APP_SHA__ ? ` · ${__APP_SHA__}` : ""} · {__BUILD_DATE__} ·
+        cihaz-içi analiz, video yüklenmez
+      </div>
+
       {busy && <AnalyzingOverlay stage={busy.stage} p={busy.p} />}
     </div>
   );

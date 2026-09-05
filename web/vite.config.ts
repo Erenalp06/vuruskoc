@@ -1,10 +1,22 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
+import { execSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+
+const pkg = JSON.parse(readFileSync(new URL("./package.json", import.meta.url), "utf8"));
+let sha = "";
+try { sha = execSync("git rev-parse --short HEAD").toString().trim(); } catch { /* not a git checkout */ }
+const buildDate = new Date().toISOString().slice(0, 10);
 
 // Static PWA. `npm run dev` proxies /api to the (optional) Go server on :8899;
 // in production the whole thing is static — deploy web/dist to any HTTPS host.
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __APP_SHA__: JSON.stringify(sha),
+    __BUILD_DATE__: JSON.stringify(buildDate),
+  },
   plugins: [
     react(),
     VitePWA({

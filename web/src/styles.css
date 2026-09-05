@@ -366,6 +366,11 @@ video { width: 100%; border-radius: 12px; background: #000; display: block; }
 .tip-card { margin-top: 14px; }
 .tip-card .q { font: italic 500 14px/1.5 "Space Grotesk", serif; color: #e2e8f0; }
 .tip-card .by { font-size: 11px; color: var(--dim); margin-top: 8px; }
+
+.app-footer {
+  margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--line-soft);
+  font-size: 11px; color: var(--dim); text-align: center; letter-spacing: 0.02em;
+}
 .ring {
   flex: none; width: 84px; height: 84px; border-radius: 50%; display: grid; place-items: center;
   transition: background 0.8s ease;
