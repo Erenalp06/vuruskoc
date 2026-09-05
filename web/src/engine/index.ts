@@ -7,6 +7,7 @@ export * from "./frames";
 export * from "./analyze";
 export * from "./overlay";
 export * from "./history";
+export * from "./drills";
 
 import { loadVideo } from "./frames";
 

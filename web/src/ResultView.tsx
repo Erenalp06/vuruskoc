@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-  GHOST_PROS, renderProOverlay, drillURL,
-  type AnalyzeResult, type Correction, type Keypoints, type StoredResult,
+  GHOST_PROS, renderProOverlay, drillURL, recommendDrills,
+  type AnalyzeResult, type Correction, type Drill, type Keypoints, type StoredResult,
 } from "./engine";
 
 const IDEAL: Record<string, Record<string, [number, number]>> = {
@@ -82,6 +82,48 @@ function TuneRow({ r, ranges }: { r: StoredResult | AnalyzeResult; ranges: Recor
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+function DrillRow({ d }: { d: Drill }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="drill">
+      <button className="drill-head" onClick={() => setOpen((o) => !o)}>
+        <span className="drill-lvl" aria-label={`seviye ${d.level}`}>
+          {[1, 2, 3].map((i) => <i key={i} className={i <= d.level ? "on" : ""} />)}
+        </span>
+        <b>{d.name}</b>
+        <span className="drill-eq">{d.equipment}</span>
+        <span className="drill-caret">{open ? "▾" : "▸"}</span>
+      </button>
+      <div className="drill-why">{d.why}</div>
+      {open && (
+        <div className="drill-body">
+          <ol>{d.steps.map((s, i) => <li key={i}>{s}</li>)}</ol>
+          <div className="drill-reps">Tekrar · {d.reps}</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DrillPlan({ r, allIn }: { r: StoredResult | AnalyzeResult; allIn: boolean }) {
+  const drills = useMemo(
+    () => recommendDrills(r.corrections ?? [], r.stroke as any, allIn, 5),
+    [r.corrections, r.stroke, allIn]
+  );
+  if (!drills.length) return null;
+  return (
+    <div className="card">
+      <h3>Antrenman planı</h3>
+      <p className="muted" style={{ fontSize: 11.5, marginTop: -6, marginBottom: 12 }}>
+        {allIn
+          ? "Formu korumak + güç için — sıradaki antrenmanda bunları dene."
+          : "Zayıf alanlarına göre seçildi. Kolaydan zora, her birini birkaç antrenman tekrarla."}
+      </p>
+      {drills.map((d) => <DrillRow key={d.id} d={d} />)}
     </div>
   );
 }
@@ -206,6 +248,8 @@ export function ResultView({ result, keypoints, annotatedUrl, onBack }: {
           );
         })}
       </div>
+
+      <DrillPlan r={r} allIn={allIn} />
 
       <div className="res-2col">
         {annotatedUrl && (

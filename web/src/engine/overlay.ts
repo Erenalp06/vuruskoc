@@ -13,18 +13,31 @@ function pickMime(): string | null {
 async function record(canvas: HTMLCanvasElement, fps: number, draw: (i: number) => boolean): Promise<Blob | null> {
   const mime = pickMime();
   if (!mime) return null;
-  const stream = canvas.captureStream(fps);
-  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 4_000_000 });
+  // captureStream(0): the recorder samples the canvas only when we call
+  // requestFrame(), so every drawn frame lands exactly once — no dropped/
+  // duplicated frames from setTimeout jitter -> smooth playback.
+  const stream = canvas.captureStream(0);
+  const track = stream.getVideoTracks()[0] as CanvasCaptureMediaStreamTrack;
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 2_500_000 });
   const chunks: Blob[] = [];
   rec.ondataavailable = (e) => e.data.size && chunks.push(e.data);
   const done = new Promise<Blob>((res) => (rec.onstop = () => res(new Blob(chunks, { type: mime }))));
   rec.start();
+
+  const frameMs = 1000 / fps;
   await new Promise<void>((res) => {
     let i = 0;
+    let last = performance.now();
     const tick = () => {
       const more = draw(i++);
-      if (more) setTimeout(tick, 1000 / fps);
-      else { setTimeout(() => rec.stop(), 250); res(); }
+      track.requestFrame?.();
+      if (!more) { setTimeout(() => rec.stop(), 200); res(); return; }
+      // pace with rAF (smoother than setTimeout); advance ~one frame per frameMs
+      const step = () => {
+        if (performance.now() - last >= frameMs) { last += frameMs; tick(); }
+        else requestAnimationFrame(step);
+      };
+      requestAnimationFrame(step);
     };
     tick();
   });
@@ -58,16 +71,25 @@ export async function renderAnnotated(
   frames: Frame[], keypoints: (Keypoints | null)[], phases: Phase[], contactIdx: number, velocities: number[]
 ): Promise<Blob | null> {
   if (!frames.length) return null;
-  const w = frames[0].canvas.width, h = frames[0].canvas.height;
+  const sw = frames[0].canvas.width, sh = frames[0].canvas.height;
+  // cap the encode/playback size — 640px keeps the skeleton clear but is ~2x
+  // lighter to encode and decode than 720–1280.
+  const scale = Math.min(1, 640 / Math.max(sw, sh));
+  const w = Math.round(sw * scale), h = Math.round(sh * scale);
   const c = document.createElement("canvas");
   c.width = w; c.height = h;
   const ctx = c.getContext("2d")!;
+  const kscale = w / sw;
   return record(c, 24, (i) => {
     if (i >= frames.length) return false;
-    ctx.drawImage(frames[i].canvas, 0, 0);
+    ctx.drawImage(frames[i].canvas, 0, 0, w, h);
     const kp = keypoints[i];
-    if (kp) drawSkeleton(ctx, kp, "#4ade78", Math.max(2, w / 320));
-    ctx.font = `${Math.round(w / 34)}px system-ui`;
+    if (kp) {
+      const sk: Keypoints = {} as Keypoints;
+      for (const [n, v] of Object.entries(kp)) sk[n] = [v[0] * kscale, v[1] * kscale, v[2], v[3]];
+      drawSkeleton(ctx, sk, "#4ade78", Math.max(2, w / 320));
+    }
+    ctx.font = `${Math.round(w / 30)}px system-ui`;
     ctx.fillStyle = "#ffee00";
     ctx.fillText(`${phases[i] ?? "idle"}  v=${(velocities[i] ?? 0).toFixed(0)}`, 10, 24);
     if (i === contactIdx) { ctx.fillStyle = "#ff3b3b"; ctx.fillText("TEMAS", 10, 48); }
