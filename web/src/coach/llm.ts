@@ -1,4 +1,4 @@
-// Faz 1 — optional on-device LLM (WebLLM + Qwen2.5-1.5B-Instruct, q4f16).
+// Faz 1 — optional on-device LLM (WebLLM, Qwen2.5 family, q4f16).
 //
 // Progressive enhancement over the rule-based coach (respond.ts): only ever
 // loads when the device has WebGPU *and* the user explicitly opts in. Model
@@ -8,23 +8,51 @@
 //
 // The whole @mlc-ai/web-llm module (~6 MB / ~2 MB gzip) is behind the dynamic
 // import below, split into its own `webllm` chunk that the PWA never precaches.
+// The per-model WebGPU-kernel lib (.wasm) is served same-origin from
+// /webllm/ (see scripts/prepare-assets.mjs) instead of raw.githubusercontent.com.
 import type {
   MLCEngineInterface,
   InitProgressReport,
   ChatCompletionMessageParam,
 } from "@mlc-ai/web-llm";
 
-export const LLM_MODEL_ID = "Qwen2.5-1.5B-Instruct-q4f16_1-MLC";
-export const LLM_MODEL_LABEL = "Qwen2.5 1.5B";
-export const LLM_DOWNLOAD_MB = 950; // ~ total shard size, for the opt-in copy
-export const LLM_OPTIN_KEY = "vk-coach-llm"; // localStorage: "1" once opted in
+export type LLMModelKey = "fast" | "balanced" | "max";
 
-// The MLC model-lib (WebGPU kernels, ~5 MB) is normally fetched from
-// raw.githubusercontent.com at runtime — a host that is slow/blocked on some
-// networks (notably in TR) and an extra cross-origin surface. scripts/
-// prepare-assets.mjs downloads it into public/webllm/ at build time so we serve
-// it same-origin. Keep this filename in sync with that script.
-export const LLM_MODEL_LIB = "/webllm/Qwen2-1.5B-Instruct-q4f16_1_cs1k-webgpu.wasm";
+export type LLMModelSpec = {
+  key: LLMModelKey;
+  id: string;         // web-llm prebuilt model_id
+  label: string;      // UI tier name
+  sub: string;        // model name
+  downloadMB: number; // approx one-time download
+  lib: string;        // filename under /webllm/ (matches prepare-assets.mjs)
+  note: string;       // hardware hint
+};
+
+export const LLM_MODELS: Record<LLMModelKey, LLMModelSpec> = {
+  fast: {
+    key: "fast", id: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+    label: "Hızlı", sub: "Qwen2.5 1.5B", downloadMB: 950,
+    lib: "Qwen2-1.5B-Instruct-q4f16_1_cs1k-webgpu.wasm",
+    note: "Çoğu telefon ve dizüstünde çalışır.",
+  },
+  balanced: {
+    key: "balanced", id: "Qwen2.5-3B-Instruct-q4f16_1-MLC",
+    label: "Dengeli", sub: "Qwen2.5 3B", downloadMB: 1900,
+    lib: "Qwen2.5-3B-Instruct-q4f16_1_cs1k-webgpu.wasm",
+    note: "Daha iyi Türkçe. ~3 GB boş GPU belleği ister.",
+  },
+  max: {
+    key: "max", id: "Qwen2.5-7B-Instruct-q4f16_1-MLC",
+    label: "Güçlü", sub: "Qwen2.5 7B", downloadMB: 4500,
+    lib: "Qwen2-7B-Instruct-q4f16_1_cs1k-webgpu.wasm",
+    note: "En iyi cevaplar. Güçlü masaüstü GPU / bol RAM'li Mac.",
+  },
+};
+export const LLM_MODEL_KEYS: LLMModelKey[] = ["fast", "balanced", "max"];
+export const DEFAULT_MODEL_KEY: LLMModelKey = "fast";
+
+export const LLM_OPTIN_KEY = "vk-coach-llm";        // "1" once opted in
+export const LLM_MODEL_STORE = "vk-coach-llm-model"; // LLMModelKey
 
 export type LLMPhase = "idle" | "unsupported" | "loading" | "ready" | "error";
 
@@ -34,51 +62,62 @@ export function webgpuAvailable(): boolean {
 }
 
 export function llmOptedIn(): boolean {
-  try {
-    return localStorage.getItem(LLM_OPTIN_KEY) === "1";
-  } catch {
-    return false;
-  }
+  try { return localStorage.getItem(LLM_OPTIN_KEY) === "1"; } catch { return false; }
 }
 export function setLlmOptIn(on: boolean) {
   try {
     if (on) localStorage.setItem(LLM_OPTIN_KEY, "1");
     else localStorage.removeItem(LLM_OPTIN_KEY);
-  } catch {
-    /* private mode — non-fatal */
-  }
+  } catch { /* private mode — non-fatal */ }
+}
+export function savedModelKey(): LLMModelKey {
+  try {
+    const k = localStorage.getItem(LLM_MODEL_STORE);
+    if (k === "fast" || k === "balanced" || k === "max") return k;
+  } catch { /* ignore */ }
+  return DEFAULT_MODEL_KEY;
+}
+export function setSavedModelKey(k: LLMModelKey) {
+  try { localStorage.setItem(LLM_MODEL_STORE, k); } catch { /* ignore */ }
 }
 
 let enginePromise: Promise<MLCEngineInterface> | null = null;
+let loadedKey: LLMModelKey | null = null;
 
-/** Load (or return the already-loading) engine. Safe to call repeatedly. */
+/** Load (or return the already-loading) engine for `key`. */
 export function loadCoachLLM(
+  key: LLMModelKey,
   onProgress?: (p: InitProgressReport) => void,
 ): Promise<MLCEngineInterface> {
-  if (enginePromise) return enginePromise;
+  if (enginePromise && loadedKey === key) return enginePromise;
+  loadedKey = key;
+  const spec = LLM_MODELS[key];
   enginePromise = import("@mlc-ai/web-llm").then((webllm) => {
-    // Start from the prebuilt config but point our model's lib at the
-    // same-origin copy (see LLM_MODEL_LIB). Model *weights* still come from the
-    // HuggingFace CDN.
     const base = webllm.prebuiltAppConfig;
     const appConfig: typeof base = {
       ...base,
       model_list: base.model_list.map((m) =>
-        m.model_id === LLM_MODEL_ID
-          ? { ...m, model_lib: new URL(LLM_MODEL_LIB, location.origin).href }
+        m.model_id === spec.id
+          ? { ...m, model_lib: new URL(`/webllm/${spec.lib}`, location.origin).href }
           : m,
       ),
     };
-    return webllm.CreateMLCEngine(LLM_MODEL_ID, { appConfig, initProgressCallback: onProgress });
+    return webllm.CreateMLCEngine(spec.id, { appConfig, initProgressCallback: onProgress });
   });
-  enginePromise.catch(() => {
-    enginePromise = null; // allow a retry after a failed load
-  });
+  enginePromise.catch(() => { enginePromise = null; loadedKey = null; });
   return enginePromise;
 }
 
-export function coachLLMLoaded(): boolean {
-  return enginePromise != null;
+export function coachLLMKey(): LLMModelKey | null {
+  return enginePromise ? loadedKey : null;
+}
+
+/** Unload the current model and free its VRAM (before switching models). */
+export async function resetCoachLLM(): Promise<void> {
+  const p = enginePromise;
+  enginePromise = null;
+  loadedKey = null;
+  try { (await p)?.unload?.(); } catch { /* ignore */ }
 }
 
 /** Stream the assistant reply token-by-token. */

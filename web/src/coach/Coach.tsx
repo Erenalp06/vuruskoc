@@ -4,8 +4,9 @@ import {
   COACH_STARTER_CHIPS, type CoachCtx, type ChatMsg,
 } from "./respond";
 import {
-  webgpuAvailable, llmOptedIn, setLlmOptIn, loadCoachLLM, streamCoachLLM,
-  LLM_DOWNLOAD_MB, LLM_MODEL_LABEL, type LLMPhase,
+  webgpuAvailable, llmOptedIn, setLlmOptIn, loadCoachLLM, resetCoachLLM, streamCoachLLM,
+  savedModelKey, setSavedModelKey, LLM_MODELS, LLM_MODEL_KEYS,
+  type LLMPhase, type LLMModelKey,
 } from "./llm";
 import type { HistoryEntry } from "../engine/history";
 import type { MLCEngineInterface } from "@mlc-ai/web-llm";
@@ -49,6 +50,8 @@ export function Coach({ history, activeId }: { history: HistoryEntry[]; activeId
   const endRef = useRef<HTMLDivElement>(null);
 
   const [phase, setPhase] = useState<LLMPhase>("idle");
+  const [modelKey, setModelKey] = useState<LLMModelKey>(() => savedModelKey());
+  const [loadedKey, setLoadedKey] = useState<LLMModelKey>(() => savedModelKey());
   const [progress, setProgress] = useState<{ pct: number; text: string }>({ pct: 0, text: "" });
   const engineRef = useRef<MLCEngineInterface | null>(null);
 
@@ -69,21 +72,24 @@ export function Coach({ history, activeId }: { history: HistoryEntry[]; activeId
 
   useEffect(() => {
     if (!webgpuAvailable()) { setPhase("unsupported"); return; }
-    if (llmOptedIn()) void startLLM();
+    if (llmOptedIn()) void startLLM(savedModelKey());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selEntry = useMemo(() => history.find((e) => e.id === selId) ?? null, [history, selId]);
   const ctxFor = (): CoachCtx => ({ result: selEntry?.result ?? null, history });
 
-  async function startLLM() {
+  async function startLLM(key: LLMModelKey) {
+    setModelKey(key);
+    setSavedModelKey(key);
     setPhase("loading");
     setProgress({ pct: 0, text: "başlatılıyor…" });
     try {
-      const engine = await loadCoachLLM((p) => {
+      const engine = await loadCoachLLM(key, (p) => {
         setProgress({ pct: Math.round((p.progress ?? 0) * 100), text: p.text || "" });
       });
       engineRef.current = engine;
+      setLoadedKey(key);
       setLlmOptIn(true);
       setPhase("ready");
     } catch (e) {
@@ -92,9 +98,16 @@ export function Coach({ history, activeId }: { history: HistoryEntry[]; activeId
     }
   }
 
+  async function changeModel() {
+    engineRef.current = null;
+    await resetCoachLLM();
+    setPhase("idle"); // opt-in stays; the offer card lets them pick a tier
+  }
+
   function disableLLM() {
     setLlmOptIn(false);
     engineRef.current = null;
+    void resetCoachLLM();
     setPhase(webgpuAvailable() ? "idle" : "unsupported");
   }
 
@@ -104,10 +117,8 @@ export function Coach({ history, activeId }: { history: HistoryEntry[]; activeId
     const snapshot = msgs;
     setInput("");
     setMsgs((m) => [...m, { role: "user", text: t }]);
-
     const followUp = snapshot.length > 1;
 
-    // off-topic guard applies to both modes
     if (!isOnTopic(t, ctxFor(), followUp)) {
       setMsgs((m) => [...m, { role: "coach", text: OFFTOPIC_REPLY }]);
       setChips(COACH_STARTER_CHIPS);
@@ -119,7 +130,7 @@ export function Coach({ history, activeId }: { history: HistoryEntry[]; activeId
       setMsgs((m) => [...m, { role: "coach", text: "", ai: true }]);
       try {
         const turns: ChatMsg[] = snapshot
-          .slice(1) // drop greeting
+          .slice(1)
           .filter((m) => m.text.trim())
           .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }));
         let acc = "";
@@ -153,9 +164,10 @@ export function Coach({ history, activeId }: { history: HistoryEntry[]; activeId
   }
 
   const modeLabel =
-    phase === "ready" ? `${LLM_MODEL_LABEL} · cihazında`
-    : phase === "loading" ? "model iniyor…"
+    phase === "ready" ? `${LLM_MODELS[loadedKey].sub} · cihazında`
+    : phase === "loading" ? `${LLM_MODELS[modelKey].sub} iniyor…`
     : "kural tabanlı · cihazında";
+  const offer = LLM_MODELS[modelKey];
 
   return (
     <div className="card coach">
@@ -175,12 +187,26 @@ export function Coach({ history, activeId }: { history: HistoryEntry[]; activeId
         <div className="coach-llm-offer">
           <div className="cllo-body">
             <b>⚡ Gelişmiş yapay zekâ (deneysel)</b>
-            <span>
-              ~{LLM_DOWNLOAD_MB} MB tek seferlik indirme. Model tamamen cihazında çalışır;
-              indikten sonra internet gerekmez. Cevaplar daha akıcı ve serbest olur.
-            </span>
+            <span>Model tamamen cihazında çalışır; indikten sonra internet gerekmez.</span>
+            <div className="cllo-tiers" role="radiogroup" aria-label="Model">
+              {LLM_MODEL_KEYS.map((k) => (
+                <button
+                  key={k}
+                  className={"cllo-tier" + (modelKey === k ? " on" : "")}
+                  aria-pressed={modelKey === k}
+                  onClick={() => setModelKey(k)}
+                >
+                  <b>{LLM_MODELS[k].label}</b>
+                  <i>{LLM_MODELS[k].sub}</i>
+                  <em>~{(LLM_MODELS[k].downloadMB / 1000).toFixed(LLM_MODELS[k].downloadMB < 1000 ? 2 : 1)} GB</em>
+                </button>
+              ))}
+            </div>
+            <span className="cllo-note">{offer.note}</span>
           </div>
-          <button className="btn sm" onClick={() => void startLLM()}>Etkinleştir</button>
+          <button className="btn sm" onClick={() => void startLLM(modelKey)}>
+            İndir & etkinleştir
+          </button>
         </div>
       )}
       {phase === "loading" && (
@@ -191,8 +217,8 @@ export function Coach({ history, activeId }: { history: HistoryEntry[]; activeId
       )}
       {phase === "error" && (
         <div className="coach-llm-load err">
-          Model yüklenemedi — kural tabanlı koç aktif.{" "}
-          <button className="linklike" onClick={() => void startLLM()}>tekrar dene</button>
+          Model yüklenemedi (bellek yetmemiş olabilir — daha küçük bir model dene).{" "}
+          <button className="linklike" onClick={() => void changeModel()}>model seç</button>
         </div>
       )}
 
@@ -215,8 +241,10 @@ export function Coach({ history, activeId }: { history: HistoryEntry[]; activeId
 
       <p className="coach-note">
         {phase === "ready" ? (
-          <>Yanıtları {LLM_MODEL_LABEL} modeli cihazında üretiyor; senin analiz verin + genel tenis bilgisiyle beslenir. Sunucuya hiçbir şey gitmez.{" "}
-            <button className="linklike" onClick={disableLLM}>gelişmiş modu kapat</button></>
+          <>Yanıtları {LLM_MODELS[loadedKey].sub} modeli cihazında üretiyor; senin analiz verin + genel tenis bilgisiyle beslenir. Sunucuya hiçbir şey gitmez.{" "}
+            <button className="linklike" onClick={() => void changeModel()}>modeli değiştir</button>
+            {" · "}
+            <button className="linklike" onClick={disableLLM}>kapat</button></>
         ) : phase === "unsupported" ? (
           <>Bu tarayıcı WebGPU desteklemediği için gelişmiş model kullanılamıyor. Kurallı motor — internet, hesap ve LLM gerektirmez.</>
         ) : (
