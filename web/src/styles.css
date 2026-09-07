@@ -491,6 +491,7 @@ video { width: 100%; border-radius: 12px; background: #000; display: block; }
 @keyframes pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
 
 /* ── AI Koç (rule-based coach, Faz 0) ───────────────────────────── */
+.card.coach { margin-top: 18px; }
 .card.coach > h3 { display: flex; align-items: center; gap: 8px; }
 .coach-beta {
   font: 500 10px "Space Grotesk", sans-serif; letter-spacing: 0.04em;
@@ -555,3 +556,14 @@ video { width: 100%; border-radius: 12px; background: #000; display: block; }
 .ctyping i:nth-child(2) { animation-delay: 0.15s; }
 .ctyping i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes ctype { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
+
+/* AI Koç — analysis context picker */
+.coach-ctx { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
+.coach-ctx > span {
+  font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--dim);
+}
+.coach-ctx select {
+  background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
+  border-radius: 9px; padding: 8px 10px; font-size: 12.5px; width: 100%;
+}
+.coach-ctx select:focus { outline: none; border-color: #ccff0055; }

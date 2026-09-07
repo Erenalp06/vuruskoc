@@ -3,7 +3,6 @@ import {
   GHOST_PROS, renderProOverlay, drillURL, recommendDrills,
   type AnalyzeResult, type Correction, type Drill, type Keypoints, type StoredResult,
 } from "./engine";
-import { Coach } from "./coach/Coach";
 
 const IDEAL: Record<string, Record<string, [number, number]>> = {
   forehand: { elbow_angle: [85, 142], hip_rotation: [33, 120], shoulder_angle: [35, 80], knee_angle: [132, 172], racket_lag: [83, 164] },
@@ -296,8 +295,6 @@ export function ResultView({ result, keypoints, annotatedUrl, onBack }: {
       {r.injury_warnings.length > 0 && (
         <div className="warnbox">{r.injury_warnings.map((w, i) => <div key={i}>⚠ {w}</div>)}</div>
       )}
-
-      <Coach result={r} />
 
       {reportLines.length > 0 && (
         <div className="card">

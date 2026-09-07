@@ -1,19 +1,27 @@
-import { useEffect, useRef, useState } from "react";
-import { coachReply, buildCoachMessages, COACH_STARTER_CHIPS, type CoachCtx } from "./respond";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  coachReply, buildCoachMessages, isOnTopic, OFFTOPIC_REPLY,
+  COACH_STARTER_CHIPS, type CoachCtx, type ChatMsg,
+} from "./respond";
 import {
   webgpuAvailable, llmOptedIn, setLlmOptIn, loadCoachLLM, streamCoachLLM,
   LLM_DOWNLOAD_MB, LLM_MODEL_LABEL, type LLMPhase,
 } from "./llm";
-import { listEntries } from "../engine/history";
-import type { HistoryEntry, StoredResult } from "../engine/history";
-import type { AnalyzeResult } from "../engine/analyze";
+import type { HistoryEntry } from "../engine/history";
 import type { MLCEngineInterface } from "@mlc-ai/web-llm";
 
 type Msg = { role: "user" | "coach"; text: string; ai?: boolean };
 
 const GREETING =
-  "Merhaba! Analizin ve geçmiş kayıtlarına göre sana özel çalışma önerebilirim. " +
-  "Bir şey sor ya da aşağıdakilerden birini seç.";
+  "Merhaba! Tenis tekniğin ve vuruş analizlerin hakkında sorularını yanıtlarım. " +
+  "Yukarıdan hangi analizi konuşmak istediğini seçebilirsin. Tenis dışı konularda yardımcı olamam.";
+
+const strokeTR = (s: string) => (s === "serve" ? "servis" : s === "backhand" ? "backhand" : "forehand");
+function entryLabel(e: HistoryEntry): string {
+  const d = new Date(e.created_at).toLocaleDateString("tr-TR", { day: "numeric", month: "short" });
+  const sc = e.result.swing_score != null ? `${Math.round(e.result.swing_score)}` : "–";
+  return `${d} · ${strokeTR(e.result.stroke)} · ${sc}/100`;
+}
 
 function Bubble({ m }: { m: Msg }) {
   return (
@@ -32,27 +40,41 @@ function Bubble({ m }: { m: Msg }) {
   );
 }
 
-export function Coach({ result }: { result?: StoredResult | AnalyzeResult | null }) {
-  const [history, setHistory] = useState<HistoryEntry[]>([]);
+export function Coach({ history, activeId }: { history: HistoryEntry[]; activeId?: string | null }) {
+  const [selId, setSelId] = useState<string>("");
   const [msgs, setMsgs] = useState<Msg[]>([{ role: "coach", text: GREETING }]);
   const [chips, setChips] = useState<string[]>(COACH_STARTER_CHIPS);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
 
-  // ── optional on-device LLM ──
   const [phase, setPhase] = useState<LLMPhase>("idle");
   const [progress, setProgress] = useState<{ pct: number; text: string }>({ pct: 0, text: "" });
   const engineRef = useRef<MLCEngineInterface | null>(null);
 
-  useEffect(() => { listEntries().then(setHistory).catch(() => {}); }, []);
+  // keep the analysis picker in sync: jump to a newly-opened result, but don't
+  // override a manual pick, and fall back if the selected entry disappears
+  const lastActive = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeId && activeId !== lastActive.current && history.some((e) => e.id === activeId)) {
+      lastActive.current = activeId;
+      setSelId(activeId);
+      return;
+    }
+    lastActive.current = activeId ?? null;
+    setSelId((cur) => (cur && history.some((e) => e.id === cur) ? cur : history[0]?.id ?? ""));
+  }, [activeId, history]);
+
   useEffect(() => { endRef.current?.scrollIntoView({ block: "nearest" }); }, [msgs]);
 
   useEffect(() => {
     if (!webgpuAvailable()) { setPhase("unsupported"); return; }
-    if (llmOptedIn()) void startLLM(); // resume — shards are already cached, fast
+    if (llmOptedIn()) void startLLM();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const selEntry = useMemo(() => history.find((e) => e.id === selId) ?? null, [history, selId]);
+  const ctxFor = (): CoachCtx => ({ result: selEntry?.result ?? null, history });
 
   async function startLLM() {
     setPhase("loading");
@@ -76,20 +98,32 @@ export function Coach({ result }: { result?: StoredResult | AnalyzeResult | null
     setPhase(webgpuAvailable() ? "idle" : "unsupported");
   }
 
-  const ctxFor = (): CoachCtx => ({ result: result ?? history[0]?.result ?? null, history });
-
   async function ask(text: string) {
     const t = text.trim();
     if (!t || busy) return;
+    const snapshot = msgs;
     setInput("");
     setMsgs((m) => [...m, { role: "user", text: t }]);
+
+    const followUp = snapshot.length > 1;
+
+    // off-topic guard applies to both modes
+    if (!isOnTopic(t, ctxFor(), followUp)) {
+      setMsgs((m) => [...m, { role: "coach", text: OFFTOPIC_REPLY }]);
+      setChips(COACH_STARTER_CHIPS);
+      return;
+    }
 
     if (phase === "ready" && engineRef.current) {
       setBusy(true);
       setMsgs((m) => [...m, { role: "coach", text: "", ai: true }]);
       try {
+        const turns: ChatMsg[] = snapshot
+          .slice(1) // drop greeting
+          .filter((m) => m.text.trim())
+          .map((m) => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }));
         let acc = "";
-        for await (const tok of streamCoachLLM(engineRef.current, buildCoachMessages(t, ctxFor()) as any)) {
+        for await (const tok of streamCoachLLM(engineRef.current, buildCoachMessages(t, ctxFor(), turns) as any)) {
           acc += tok;
           setMsgs((m) => {
             const n = m.slice();
@@ -100,7 +134,7 @@ export function Coach({ result }: { result?: StoredResult | AnalyzeResult | null
         if (!acc.trim()) throw new Error("empty");
       } catch (e) {
         console.error("[coach] generation failed, falling back", e);
-        const ans = coachReply(t, ctxFor());
+        const ans = coachReply(t, ctxFor(), { followUp });
         setMsgs((m) => {
           const n = m.slice();
           n[n.length - 1] = { role: "coach", text: ans.text };
@@ -113,7 +147,7 @@ export function Coach({ result }: { result?: StoredResult | AnalyzeResult | null
       return;
     }
 
-    const ans = coachReply(t, ctxFor());
+    const ans = coachReply(t, ctxFor(), { followUp });
     setMsgs((m) => [...m, { role: "coach", text: ans.text }]);
     setChips(ans.chips ?? COACH_STARTER_CHIPS);
   }
@@ -126,6 +160,16 @@ export function Coach({ result }: { result?: StoredResult | AnalyzeResult | null
   return (
     <div className="card coach">
       <h3>AI Koç <span className="coach-beta">beta · {modeLabel}</span></h3>
+
+      <label className="coach-ctx">
+        <span>Konuşulan analiz</span>
+        <select value={selId} onChange={(e) => setSelId(e.target.value)}>
+          <option value="">Genel (analiz seçili değil)</option>
+          {history.map((e) => (
+            <option key={e.id} value={e.id}>{entryLabel(e)}</option>
+          ))}
+        </select>
+      </label>
 
       {phase === "idle" && (
         <div className="coach-llm-offer">
@@ -165,7 +209,7 @@ export function Coach({ result }: { result?: StoredResult | AnalyzeResult | null
 
       <form className="coach-input" onSubmit={(e) => { e.preventDefault(); void ask(input); }}>
         <input value={input} onChange={(e) => setInput(e.target.value)}
-          placeholder={busy ? "koç yazıyor…" : "Bir şey sor…"} disabled={busy} />
+          placeholder={busy ? "koç yazıyor…" : "Tenisle ilgili bir şey sor…"} disabled={busy} />
         <button className="btn sm" type="submit" disabled={!input.trim() || busy}>Sor</button>
       </form>
 

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trimmer } from "./Trimmer";
 import { BgDecor } from "./BgDecor";
 import { ResultView } from "./ResultView";
+import { Coach } from "./coach/Coach";
 import {
   analyzeVideo, renderAnnotated, probeVideo, stripResult,
   saveEntry, listEntries, getEntry, deleteEntry,
@@ -202,7 +203,7 @@ function AnalyzingOverlay({ stage, p }: { stage: string; p: number }) {
 }
 
 type View =
-  | { kind: "fresh"; result: AnalyzeResult; annotatedUrl: string | null }
+  | { kind: "fresh"; result: AnalyzeResult; annotatedUrl: string | null; id: string }
   | { kind: "history"; entry: HistoryEntry; annotatedUrl: string | null };
 
 export function App() {
@@ -271,7 +272,7 @@ export function App() {
         annotated: blob ?? undefined,
       });
       refreshHistory();
-      setView({ kind: "fresh", result, annotatedUrl });
+      setView({ kind: "fresh", result, annotatedUrl, id });
     } catch (e) {
       setErr(String(e));
     } finally {
@@ -380,6 +381,11 @@ export function App() {
           )}
 
           {resultProps && <ResultView {...resultProps} onBack={reset} />}
+
+          <Coach
+            history={history}
+            activeId={view?.kind === "fresh" ? view.id : view?.kind === "history" ? view.entry.id : null}
+          />
         </div>
 
         <History items={history} onOpen={openHistory} onDelete={removeEntry} />
