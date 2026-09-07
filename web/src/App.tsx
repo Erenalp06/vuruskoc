@@ -187,10 +187,15 @@ function AnalyzingOverlay({ stage, p }: { stage: string; p: number }) {
   return (
     <div className="overlay" role="dialog" aria-modal="true" aria-label="Analiz ediliyor">
       <div className="overlay-card">
-        <div className="overlay-mark">
-          <svg width="24" height="24" viewBox="0 0 64 64" fill="none">
-            <path d="M14 46 L30 22 L30 38 L50 14" stroke="#12200a" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+        <div className="ball-scene" aria-hidden>
+          <div className="tball">
+            <svg viewBox="0 0 40 40">
+              <circle cx="20" cy="20" r="19" fill="#d7f24a" />
+              <path d="M2.5 11 Q19 20 2.5 31" fill="none" stroke="#fbfff0" strokeWidth="2.2" />
+              <path d="M37.5 9 Q21 20 37.5 31" fill="none" stroke="#fbfff0" strokeWidth="2.2" />
+            </svg>
+          </div>
+          <div className="tshadow" />
         </div>
         <h4>Vuruşun analiz ediliyor</h4>
         <div className="stage">{stage} — %{Math.round(p * 100)}</div>

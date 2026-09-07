@@ -109,6 +109,39 @@ a { color: var(--accent); }
   box-shadow: 0 10px 30px -6px #ccff0055;
   animation: pulse 1.4s ease-in-out infinite;
 }
+
+/* bouncing tennis ball while analysing */
+.ball-scene { position: relative; width: 72px; height: 74px; margin: 4px auto 18px; }
+.tball {
+  position: absolute; left: 16px; top: 0; width: 40px; height: 40px;
+  transform-origin: 50% 100%;
+  animation: tbounce 0.85s infinite;
+}
+.tball svg {
+  width: 100%; height: 100%; display: block;
+  filter: drop-shadow(0 4px 5px #0007);
+  animation: tspin 1.7s linear infinite;
+}
+.tshadow {
+  position: absolute; left: 12px; bottom: 0; width: 48px; height: 9px;
+  background: radial-gradient(ellipse at center, #ccff0066, transparent 70%);
+  border-radius: 50%; animation: tshadow 0.85s infinite;
+}
+@keyframes tbounce {
+  0%   { top: 0;    transform: scaleY(1);        animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.4); }
+  45%  { top: 30px; transform: scaleY(1);        animation-timing-function: cubic-bezier(0.1, 0.6, 0.5, 1); }
+  52%  { top: 34px; transform: scaleY(0.82) scaleX(1.12); }
+  60%  { top: 30px; transform: scaleY(1);        animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.4); }
+  100% { top: 0;    transform: scaleY(1);        animation-timing-function: cubic-bezier(0.1, 0.6, 0.5, 1); }
+}
+@keyframes tspin { to { transform: rotate(360deg); } }
+@keyframes tshadow {
+  0%, 100% { transform: scale(0.68); opacity: 0.3; }
+  52%      { transform: scale(1.1);  opacity: 0.75; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .tball, .tball svg, .tshadow { animation: none; }
+}
 .overlay-card h4 { font: 600 16px "Space Grotesk", sans-serif; color: #f8fafc; margin: 0 0 4px; }
 .overlay-card .stage { font-size: 12.5px; color: var(--muted); margin-bottom: 16px; min-height: 18px; }
 .overlay-bar { height: 6px; background: #ffffff12; border-radius: 4px; overflow: hidden; }
@@ -490,42 +523,119 @@ video { width: 100%; border-radius: 12px; background: #000; display: block; }
 .run-dots i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
 
-/* ── AI Koç (rule-based coach, Faz 0) ───────────────────────────── */
-.card.coach { margin-top: 18px; }
-.card.coach > h3 { display: flex; align-items: center; gap: 8px; }
+/* ══════════════════ VuruşKoç AI — coach chat ══════════════════ */
+.card.coach { margin-top: 18px; display: flex; flex-direction: column; }
+
+/* header */
+.coach-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.cav {
+  flex: none; display: grid; place-items: center; border-radius: 50%;
+  background: linear-gradient(145deg, var(--accent), #9be000);
+  box-shadow: 0 4px 14px -4px #ccff0066;
+  width: 26px; height: 26px;
+}
+.cav.big { width: 34px; height: 34px; }
+.coach-head-t { flex: 1; min-width: 0; }
+.coach-title {
+  font: 700 14px "Space Grotesk", sans-serif; letter-spacing: -0.01em; color: var(--text);
+  display: flex; align-items: center; gap: 7px;
+}
 .coach-beta {
-  font: 500 10px "Space Grotesk", sans-serif; letter-spacing: 0.04em;
-  color: var(--violet); border: 1px solid #8a6cff44; border-radius: 999px;
-  padding: 2px 8px; text-transform: none;
+  font: 600 9px "Space Grotesk", sans-serif; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--violet); border: 1px solid #8a6cff55; border-radius: 999px; padding: 2px 6px;
 }
+.coach-sub { font-size: 11px; color: var(--dim); margin-top: 1px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.coach-head-act { display: flex; gap: 6px; flex: none; }
+.coach-ic {
+  width: 26px; height: 26px; border-radius: 8px; cursor: pointer; transition: 0.15s;
+  background: #ffffff08; border: 1px solid var(--line); color: var(--muted);
+  font-size: 13px; line-height: 1; display: grid; place-items: center;
+}
+.coach-ic:hover { color: var(--text); background: #ffffff14; }
+
+/* context line */
+.coach-ctx-line { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.coach-ctx-line b { color: var(--text); font-weight: 600; }
+.coach-ctx-line .linklike { font-size: 11px; }
+
+/* message log */
 .coach-log {
-  display: flex; flex-direction: column; gap: 10px;
-  max-height: 340px; overflow-y: auto; padding: 4px 2px 4px 0; margin-top: 4px;
+  display: flex; flex-direction: column; gap: 12px;
+  max-height: 360px; overflow-y: auto; padding: 6px 2px; margin-top: 4px;
 }
-.cmsg { font-size: 13px; line-height: 1.55; border-radius: 12px; padding: 9px 12px; max-width: 92%; }
-.cmsg.coach { background: var(--panel-2); border: 1px solid var(--line); color: #dbe2ec; align-self: flex-start; }
-.cmsg.user { background: #ccff0012; border: 1px solid #ccff0033; color: var(--text); align-self: flex-end; }
-.cmsg .cbul { position: relative; padding-left: 14px; margin-top: 2px; }
-.cmsg .cbul::before { content: "•"; position: absolute; left: 2px; color: var(--accent); }
-.cmsg .cbul.cbul-sub { padding-left: 26px; color: var(--muted); font-size: 12.5px; }
-.cmsg .cbul.cbul-sub::before { left: 14px; color: var(--dim); }
-.cmsg .cgap { height: 6px; }
-.coach-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.coach-chips .chip {
+.cmsg { display: flex; gap: 8px; max-width: 100%; }
+.cmsg.user { flex-direction: row-reverse; }
+.cmsg.meta { justify-content: center; }
+.cmsg-col { display: flex; flex-direction: column; min-width: 0; max-width: 86%; }
+.cmsg.user .cmsg-col { align-items: flex-end; }
+.cbubble {
+  font-size: 13px; line-height: 1.55; border-radius: 13px; padding: 9px 12px;
+  background: var(--panel-2); border: 1px solid var(--line); color: #dbe2ec;
+  border-top-left-radius: 5px; word-break: break-word;
+}
+.cmsg.user .cbubble {
+  background: linear-gradient(145deg, #d4ff2e, #b6e600); color: #10200a; border: none;
+  border-top-left-radius: 13px; border-top-right-radius: 5px; font-weight: 500;
+}
+.cmsg.meta .cbubble {
+  background: transparent; border: none; color: var(--muted); font-size: 11.5px;
+  padding: 2px 6px; text-align: center;
+}
+.cmsg-time { font-size: 9.5px; color: var(--dim); margin: 3px 4px 0; }
+.ctyping { display: inline-flex; gap: 3px; padding: 3px 2px; }
+.ctyping i { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); animation: ctype 1s ease-in-out infinite; }
+.ctyping i:nth-child(2) { animation-delay: 0.15s; }
+.ctyping i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes ctype { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
+
+/* analysis picker inside a message */
+.coach-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.coach-pick .chip {
   font: 500 12px "Space Grotesk", sans-serif; color: var(--text);
   background: #ffffff08; border: 1px solid var(--line); border-radius: 999px;
   padding: 6px 11px; cursor: pointer; transition: 0.2s;
 }
-.coach-chips .chip:hover { background: #ffffff14; border-color: #ccff0044; }
-.coach-input { display: flex; gap: 8px; margin-top: 12px; }
+.coach-pick .chip:hover:not(:disabled) { background: #ffffff14; border-color: #ccff0044; }
+.coach-pick .chip.ghost { color: var(--muted); border-style: dashed; }
+.coach-pick .chip:disabled { opacity: 0.5; cursor: default; }
+
+/* suggestion chips */
+.coach-chips { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.coach-chips .chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 500 12px "Space Grotesk", sans-serif; color: var(--text);
+  background: #ffffff08; border: 1px solid var(--line); border-radius: 999px;
+  padding: 7px 12px; cursor: pointer; transition: 0.2s;
+}
+.coach-chips .chip:hover:not(:disabled) { background: #ffffff14; border-color: #ccff0044; }
+.coach-chips .chip:disabled { opacity: 0.45; cursor: default; }
+.chip-ic { font-size: 12px; line-height: 1; }
+
+/* input row */
+.coach-input { display: flex; gap: 8px; margin-top: 12px; align-items: center; }
 .coach-input input {
   flex: 1; background: var(--panel-2); color: var(--text);
-  border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 13px;
+  border: 1px solid var(--line); border-radius: 999px; padding: 10px 15px; font-size: 13px;
 }
 .coach-input input:focus { outline: none; border-color: #ccff0055; }
-.coach-note { font-size: 10.5px; color: var(--dim); line-height: 1.5; margin: 10px 0 0; }
+.coach-send {
+  flex: none; width: 38px; height: 38px; border-radius: 50%; cursor: pointer;
+  background: linear-gradient(145deg, var(--accent), #a9db00); color: #12200a; border: 0;
+  display: grid; place-items: center; transition: 0.16s;
+  box-shadow: 0 8px 22px -8px #ccff0077;
+}
+.coach-send:hover:not(:disabled) { transform: translateY(-1px); }
+.coach-send:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
 
-/* ── AI Koç — Faz 1 on-device LLM opt-in ───────────────────────── */
+/* status footer */
+.coach-status { display: flex; align-items: center; gap: 7px; margin-top: 11px; font-size: 10.5px; color: var(--dim); }
+.cst-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); flex: none; }
+.cst-dot.on { background: var(--good); box-shadow: 0 0 0 3px #4ade8033; }
+.cst-dot.busy { background: var(--warn); animation: pulse 1s ease-in-out infinite; }
+.cst-links { margin-left: auto; display: flex; gap: 10px; }
+.cst-links .linklike { font-size: 10.5px; }
+
+/* on-device model opt-in */
 .coach-llm-offer {
   display: flex; flex-direction: column; gap: 10px; margin-top: 10px;
   background: #8a6cff0d; border: 1px solid #8a6cff33; border-radius: 12px; padding: 12px 13px;
@@ -548,9 +658,7 @@ video { width: 100%; border-radius: 12px; background: #000; display: block; }
 .cllo-note { font-size: 11px; color: var(--muted); line-height: 1.45; }
 .coach-llm-load { margin-top: 10px; font-size: 11.5px; color: var(--muted); }
 .coach-llm-load.err { color: #fecdd3; }
-.cll-bar {
-  height: 5px; border-radius: 999px; background: #ffffff12; overflow: hidden; margin-bottom: 6px;
-}
+.cll-bar { height: 5px; border-radius: 999px; background: #ffffff12; overflow: hidden; margin-bottom: 6px; }
 .cll-bar span {
   display: block; height: 100%; background: linear-gradient(90deg, var(--violet), var(--accent));
   transition: width 0.3s ease;
@@ -560,30 +668,40 @@ video { width: 100%; border-radius: 12px; background: #000; display: block; }
   background: none; border: none; color: var(--accent); font: inherit; padding: 0;
   cursor: pointer; text-decoration: underline;
 }
-.ctyping { display: inline-flex; gap: 3px; padding: 3px 0; }
-.ctyping i {
-  width: 5px; height: 5px; border-radius: 50%; background: var(--muted);
-  animation: ctype 1s ease-in-out infinite;
-}
-.ctyping i:nth-child(2) { animation-delay: 0.15s; }
-.ctyping i:nth-child(3) { animation-delay: 0.3s; }
-@keyframes ctype { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
 
-/* AI Koç — chat-driven analysis context */
-.coach-ctx-line {
-  display: flex; align-items: center; gap: 8px; margin-top: 8px;
-  font-size: 11px; color: var(--muted);
+/* expanded / full-screen */
+.coach-backdrop {
+  position: fixed; inset: 0; z-index: 59; background: #05070cd0;
+  backdrop-filter: blur(3px); animation: cfade 0.15s ease;
 }
-.coach-ctx-line b { color: var(--text); font-weight: 600; }
-.coach-ctx-line .linklike { font-size: 11px; }
+@keyframes cfade { from { opacity: 0; } }
+.card.coach.coach--expanded {
+  position: fixed; z-index: 60; top: 3.5vh; left: 50%; transform: translateX(-50%);
+  width: min(760px, 94vw); max-height: 93vh;
+  border-color: #ccff0055; box-shadow: 0 0 0 1px #ccff0022, 0 40px 120px -20px #000;
+  animation: cpop 0.16s ease;
+}
+@keyframes cpop { from { opacity: 0; transform: translate(-50%, 10px); } }
+.coach--expanded .coach-log { max-height: none; flex: 1; }
+.coach--expanded .cmsg-col { max-width: 78%; }
 
-.cmsg.meta { background: transparent; border: none; color: var(--muted); padding: 4px 2px; }
-.coach-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
-.coach-pick .chip {
-  font: 500 12px "Space Grotesk", sans-serif; color: var(--text);
-  background: #ffffff08; border: 1px solid var(--line); border-radius: 999px;
-  padding: 6px 11px; cursor: pointer; transition: 0.2s;
+/* markdown */
+.md { font-size: 13px; line-height: 1.6; }
+.md > :first-child { margin-top: 0; }
+.md > :last-child { margin-bottom: 0; }
+.md-p { margin: 0 0 8px; }
+.md-h { margin: 12px 0 6px; font-family: "Space Grotesk", sans-serif; color: var(--text); line-height: 1.3; }
+.md-h4 { font-size: 13.5px; font-weight: 600; }
+.md-h5 { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.md-list { margin: 6px 0 8px; padding-left: 20px; }
+.md-list li { margin: 3px 0; }
+.md-list li::marker { color: var(--accent); }
+.md-sub { margin: 3px 0 3px 4px; padding-left: 18px; list-style: circle; }
+.md-sub li::marker { color: var(--dim); }
+.md-quote { margin: 8px 0; padding: 4px 0 4px 10px; border-left: 2px solid #8a6cff55; color: var(--muted); }
+.md code {
+  background: #ffffff12; border-radius: 4px; padding: 1px 5px; font-size: 12px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
 }
-.coach-pick .chip:hover:not(:disabled) { background: #ffffff14; border-color: #ccff0044; }
-.coach-pick .chip.ghost { color: var(--muted); border-style: dashed; }
-.coach-pick .chip:disabled { opacity: 0.5; cursor: default; }
+.md strong { color: var(--text); font-weight: 600; }
+.md hr { border: none; border-top: 1px solid var(--line); margin: 10px 0; }

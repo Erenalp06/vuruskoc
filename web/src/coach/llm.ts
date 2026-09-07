@@ -133,10 +133,10 @@ export async function* streamCoachLLM(
     stream: true,
     temperature: 0.35,
     top_p: 0.9,
-    frequency_penalty: 0.3,
-    presence_penalty: 0.3,
-    repetition_penalty: 1.15,
-    max_tokens: 420,
+    frequency_penalty: 0.4,
+    presence_penalty: 0.4,
+    repetition_penalty: 1.18,
+    max_tokens: 340,
   });
 
   let acc = "";
@@ -145,7 +145,7 @@ export async function* streamCoachLLM(
     const piece = chunk.choices[0]?.delta?.content;
     if (!piece) continue;
     acc += piece;
-    if (acc.length > 240 && loopingTail(acc)) {
+    if (acc.length > 220 && looping(acc)) {
       try { engine.interruptGenerate(); } catch { /* ignore */ }
       break;
     }
@@ -153,9 +153,15 @@ export async function* streamCoachLLM(
   }
 }
 
-/** Detect a degenerate ending: the last ~60 chars appearing again just before. */
-function loopingTail(s: string): boolean {
-  const tail = s.slice(-60).trim();
-  if (tail.length < 40) return false;
-  return s.slice(0, -60).includes(tail);
+/** Detect a degenerate tail: the last chunk of text (char- or sentence-level)
+ *  already appeared earlier — small models fall into this. */
+function looping(s: string): boolean {
+  const tail = s.slice(-64).trim();
+  if (tail.length >= 44 && s.slice(0, -64).includes(tail)) return true;
+  const sents = s.split(/(?<=[.!?])\s+/).map((x) => x.trim()).filter((x) => x.length > 24);
+  if (sents.length >= 2) {
+    const last = sents[sents.length - 1];
+    if (sents.slice(0, -1).some((x) => x === last || (x.length > 40 && (x.includes(last) || last.includes(x))))) return true;
+  }
+  return false;
 }
