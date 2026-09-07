@@ -59,6 +59,7 @@ web/dev-dist/
 # generated / downloaded (see web/scripts/prepare-assets.mjs)
 web/public/mediapipe/
 web/public/models/
+web/public/webllm/
 web/*.zip
 
 # ── never commit: media, datasets, build artifacts ──

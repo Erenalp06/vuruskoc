@@ -19,6 +19,13 @@ export const LLM_MODEL_LABEL = "Qwen2.5 1.5B";
 export const LLM_DOWNLOAD_MB = 950; // ~ total shard size, for the opt-in copy
 export const LLM_OPTIN_KEY = "vk-coach-llm"; // localStorage: "1" once opted in
 
+// The MLC model-lib (WebGPU kernels, ~5 MB) is normally fetched from
+// raw.githubusercontent.com at runtime — a host that is slow/blocked on some
+// networks (notably in TR) and an extra cross-origin surface. scripts/
+// prepare-assets.mjs downloads it into public/webllm/ at build time so we serve
+// it same-origin. Keep this filename in sync with that script.
+export const LLM_MODEL_LIB = "/webllm/Qwen2-1.5B-Instruct-q4f16_1_cs1k-webgpu.wasm";
+
 export type LLMPhase = "idle" | "unsupported" | "loading" | "ready" | "error";
 
 /** WebGPU is the hard requirement for WebLLM; there is no WASM fallback. */
@@ -49,9 +56,21 @@ export function loadCoachLLM(
   onProgress?: (p: InitProgressReport) => void,
 ): Promise<MLCEngineInterface> {
   if (enginePromise) return enginePromise;
-  enginePromise = import("@mlc-ai/web-llm").then((webllm) =>
-    webllm.CreateMLCEngine(LLM_MODEL_ID, { initProgressCallback: onProgress }),
-  );
+  enginePromise = import("@mlc-ai/web-llm").then((webllm) => {
+    // Start from the prebuilt config but point our model's lib at the
+    // same-origin copy (see LLM_MODEL_LIB). Model *weights* still come from the
+    // HuggingFace CDN.
+    const base = webllm.prebuiltAppConfig;
+    const appConfig: typeof base = {
+      ...base,
+      model_list: base.model_list.map((m) =>
+        m.model_id === LLM_MODEL_ID
+          ? { ...m, model_lib: new URL(LLM_MODEL_LIB, location.origin).href }
+          : m,
+      ),
+    };
+    return webllm.CreateMLCEngine(LLM_MODEL_ID, { appConfig, initProgressCallback: onProgress });
+  });
   enginePromise.catch(() => {
     enginePromise = null; // allow a retry after a failed load
   });

@@ -41,14 +41,14 @@ export default defineConfig({
         // precache only the app shell; the big files are runtime-cached on first use
         globPatterns: ["**/*.{js,css,html,woff2,woff,svg}"],
         globIgnores: [
-          "**/mediapipe/**", "**/models/**", "**/drills/**",
+          "**/mediapipe/**", "**/models/**", "**/drills/**", "**/webllm/**",
           "**/assets/webllm-*.js", // opt-in only — never ship it in the base install
         ],
         navigateFallback: "/index.html",
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => /\/(models|mediapipe|drills)\//.test(url.pathname),
+            urlPattern: ({ url }) => /\/(models|mediapipe|drills|webllm)\//.test(url.pathname),
             handler: "CacheFirst",
             options: {
               cacheName: "vk-engine-assets-2",
