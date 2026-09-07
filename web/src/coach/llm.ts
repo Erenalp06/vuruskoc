@@ -120,7 +120,9 @@ export async function resetCoachLLM(): Promise<void> {
   try { (await p)?.unload?.(); } catch { /* ignore */ }
 }
 
-/** Stream the assistant reply token-by-token. */
+/** Stream the assistant reply token-by-token. Small models (esp. 1.5B) can fall
+ *  into a repeat loop — penalties make it rare and a tail-repeat check stops it
+ *  if it still happens. */
 export async function* streamCoachLLM(
   engine: MLCEngineInterface,
   messages: ChatCompletionMessageParam[],
@@ -129,13 +131,31 @@ export async function* streamCoachLLM(
   const stream = await engine.chat.completions.create({
     messages,
     stream: true,
-    temperature: 0.5,
+    temperature: 0.35,
     top_p: 0.9,
-    max_tokens: 640,
+    frequency_penalty: 0.3,
+    presence_penalty: 0.3,
+    repetition_penalty: 1.15,
+    max_tokens: 420,
   });
+
+  let acc = "";
   for await (const chunk of stream) {
     if (signal?.aborted) break;
     const piece = chunk.choices[0]?.delta?.content;
-    if (piece) yield piece;
+    if (!piece) continue;
+    acc += piece;
+    if (acc.length > 240 && loopingTail(acc)) {
+      try { engine.interruptGenerate(); } catch { /* ignore */ }
+      break;
+    }
+    yield piece;
   }
+}
+
+/** Detect a degenerate ending: the last ~60 chars appearing again just before. */
+function loopingTail(s: string): boolean {
+  const tail = s.slice(-60).trim();
+  if (tail.length < 40) return false;
+  return s.slice(0, -60).includes(tail);
 }

@@ -353,7 +353,23 @@ function contextFacts(ctx: CoachCtx): string[] {
   return f;
 }
 
-function contextKB(input: string, ctx: CoachCtx): KBChunk[] {
+// KB retrieval for the LLM prompt. With a confident DRAFT the answer is already
+// grounded, so we only add KB that maps to a *real* correction (nothing, when the
+// swing is clean) — free-text KB seeds were making the small model invent faults.
+function contextKB(input: string, ctx: CoachCtx, hasDraft: boolean): KBChunk[] {
+  const r = ctx.result;
+  const fromCorr: KBChunk[] = [];
+  if (r) {
+    for (const c of corrections(r)) {
+      const m = (c.clipMetric ?? c.metric) as string;
+      const hit = KB.find((k) => (k.targets ?? []).includes(`${m}:${c.direction}`) || (k.targets ?? []).includes(m));
+      if (hit) fromCorr.push(hit);
+    }
+  }
+  if (hasDraft) {
+    return [...new Map(fromCorr.map((c) => [c.id, c])).values()].slice(0, 2);
+  }
+
   const q = norm(input);
   const seeds: string[] = [];
   const add = (...ids: string[]) => seeds.push(...ids);
@@ -363,47 +379,43 @@ function contextKB(input: string, ctx: CoachCtx): KBChunk[] {
   if (/(gec temas|gec kali|top arkamda|erken hazirlik)/.test(q)) add("fh-late-contact", "contact-point");
   if (/(plan|antrenman|program)/.test(q) || /\d\s*(dk|dakika)/.test(q)) add("weekly-structure", "warmup", "consistency-first");
   if (/(evde|raketsiz|kortsuz|sahasiz)/.test(q)) add("home-no-racket", "home-wall");
-  const r = ctx.result;
-  if (r) {
-    for (const c of corrections(r)) {
-      const m = (c.clipMetric ?? c.metric) as string;
-      const hit = KB.find((k) => (k.targets ?? []).includes(`${m}:${c.direction}`) || (k.targets ?? []).includes(m));
-      if (hit) add(hit.id);
-    }
-  }
   const bySeed = seeds.map(kbById).filter((c): c is KBChunk => !!c);
   const byText = kbSearch(input, 3);
-  return [...new Map([...bySeed, ...byText].map((c) => [c.id, c])).values()].slice(0, 4);
+  return [...new Map([...fromCorr, ...bySeed, ...byText].map((c) => [c.id, c])).values()].slice(0, 4);
 }
 
 const SYSTEM_PROMPT = [
-  'Sen "VuruşKoç" uygulamasının tenis antrenörüsün. Kısa, sıcak ve uygulanabilir konuşursun. Sadece Türkçe yaz.',
+  'Sen "VuruşKoç" uygulamasının tenis antrenörüsün. Sadece Türkçe yazarsın.',
   "",
-  "KAPSAM: Yalnızca tenis (teknik, taktik, antrenman, ekipman, sakatlık önleme) ve kullanıcının kendi vuruş",
-  "analizleri hakkında konuşursun. Tenis dışı HER soruya (kod, matematik, siyaset, başka sporlar, genel sohbet,",
-  'kişisel sorular, "sen kimsin/seni kim yaptı" vb.) yalnızca şu cümleyle yanıt ver, başka hiçbir şey ekleme:',
+  "KAPSAM: Yalnızca tenis (teknik, taktik, antrenman, ekipman, sakatlık önleme) ve kullanıcının kendi",
+  "vuruş analizleri. Tenis dışı HER soruya (kod, matematik, siyaset, başka spor, genel sohbet, kişisel",
+  'sorular) yalnızca şunu yaz, başka hiçbir şey ekleme:',
   '"Ben sadece tenis ve senin vuruş analizlerin konusunda yardımcı olabilirim."',
   "",
-  "KURALLAR:",
-  "1) BAĞLAM'daki sayılara ve BİLGİ NOTLARI'na dayan. Orada olmayan bir ölçüm ya da olgu uydurma.",
-  "2) TASLAK verildiyse onu temel al; aynı bilgiyi kendi cümlelerinle daha akıcı ve kişisel biçimde yeniden yaz, sayıları değiştirme.",
-  "3) En fazla 8 cümle veya 6 madde. Somut ol, klişe kaçın.",
-  "4) Ağrı/sakatlık işareti varsa bir sağlık uzmanına yönlendir.",
-  "5) Bu kamera tabanlı bir tahmindir, kesin ölçüm değildir.",
+  "DOĞRULUK:",
+  "- Yalnızca BAĞLAM ve TASLAK'taki bilgilere dayan. Orada olmayan ölçüm, sorun veya eksik UYDURMA.",
+  '- TASLAK "belirgin hata yok" / "ideal aralıkta" diyorsa, sen de sorun icat etme; güçlü yanları öv ve',
+  "  güç/tutarlılık için ileri adım öner.",
+  "- Sayıları olduğu gibi kullan.",
+  "",
+  "BİÇİM:",
+  "- En fazla 2 cümlelik kısa bir giriş, sonra '- ' ile başlayan en fazla 4 kısa madde.",
+  "- Aynı cümleyi veya maddeyi asla tekrarlama. Toplam 110 kelimeyi geçme.",
+  "- Sıcak ve net bir dil; klişe ve dolgu cümle yok.",
+  "",
+  "Ağrı/sakatlık işareti varsa sağlık uzmanına yönlendir. Bu kamera tabanlı bir tahmindir, kesin ölçüm değil.",
 ].join("\n");
 
 export function buildCoachMessages(input: string, ctx: CoachCtx, turns: ChatMsg[] = []): ChatMsg[] {
-  const kb = contextKB(input, ctx);
   const draft = coachDraft(input, ctx);
+  const kb = contextKB(input, ctx, !!draft);
   const system = [
     SYSTEM_PROMPT,
     "",
     "BAĞLAM (kullanıcının seçili analizi ve geçmişi):",
     ...contextFacts(ctx).map((l) => `- ${l}`),
-    "",
-    "BİLGİ NOTLARI:",
-    ...(kb.length ? kb.map((c) => `- ${c.title}: ${c.body}`) : ["- (ilgili not yok)"]),
-    ...(draft ? ["", "TASLAK (buna dayan, kendi cümlelerinle yeniden yaz):", draft] : []),
+    ...(draft ? ["", "TASLAK (kaynak gerçek — bunu daha akıcı ve kişisel biçimde yeniden yaz, bilgi ekleme/çıkarma):", draft] : []),
+    ...(kb.length ? ["", "BİLGİ NOTLARI (yalnızca gerçekten ilgiliyse kullan):", ...kb.map((c) => `- ${c.title}: ${c.body}`)] : []),
   ].join("\n");
   return [
     { role: "system", content: system },

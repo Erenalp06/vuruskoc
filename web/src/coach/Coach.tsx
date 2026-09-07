@@ -34,12 +34,14 @@ function entryLabel(e: HistoryEntry): string {
 function Lines({ text }: { text: string }) {
   return (
     <>
-      {text.split("\n").map((ln, j) =>
-        ln.startsWith("• ") ? <div key={j} className="cbul">{ln.slice(2)}</div>
-        : /^\s{2,}•\s/.test(ln) ? <div key={j} className="cbul cbul-sub">{ln.replace(/^\s+•\s/, "")}</div>
-        : ln.trim() === "" ? <div key={j} className="cgap" />
-        : <div key={j}>{ln}</div>
-      )}
+      {text.split("\n").map((ln, j) => {
+        const sub = /^\s{2,}[•\-*]\s/.test(ln);
+        const bul = /^\s*[•\-*]\s/.test(ln);
+        if (sub) return <div key={j} className="cbul cbul-sub">{ln.replace(/^\s*[•\-*]\s/, "")}</div>;
+        if (bul) return <div key={j} className="cbul">{ln.replace(/^\s*[•\-*]\s/, "")}</div>;
+        if (ln.trim() === "") return <div key={j} className="cgap" />;
+        return <div key={j}>{ln}</div>;
+      })}
     </>
   );
 }
