@@ -247,6 +247,12 @@ export function isOnTopic(input: string, ctx: CoachCtx, isFollowUp: boolean): bo
   return route(input, ctx) != null || isTennisRelated(input, isFollowUp);
 }
 
+/** True when the question is about the user's own analysis (so the coach should
+ *  make sure an analysis is selected before answering). */
+export function isAnalysisQuestion(input: string): boolean {
+  return /(son analiz|analizi anlat|analizim|analizime|nasil vurdum|nasil vurmus|ne durumda|degerlendir|neye calis|onceli|zayif|duzeltme|skorum|puanim|ilerlem|gelisim|gelisiyor)/.test(norm(input));
+}
+
 export const OFFTOPIC_REPLY =
   "Ben sadece tenis ve senin vuruş analizlerin konusunda yardımcı olabilirim.";
 

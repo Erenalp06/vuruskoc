@@ -569,13 +569,21 @@ video { width: 100%; border-radius: 12px; background: #000; display: block; }
 .ctyping i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes ctype { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
 
-/* AI Koç — analysis context picker */
-.coach-ctx { display: flex; flex-direction: column; gap: 4px; margin-top: 10px; }
-.coach-ctx > span {
-  font-size: 10px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--dim);
+/* AI Koç — chat-driven analysis context */
+.coach-ctx-line {
+  display: flex; align-items: center; gap: 8px; margin-top: 8px;
+  font-size: 11px; color: var(--muted);
 }
-.coach-ctx select {
-  background: var(--panel-2); color: var(--text); border: 1px solid var(--line);
-  border-radius: 9px; padding: 8px 10px; font-size: 12.5px; width: 100%;
+.coach-ctx-line b { color: var(--text); font-weight: 600; }
+.coach-ctx-line .linklike { font-size: 11px; }
+
+.cmsg.meta { background: transparent; border: none; color: var(--muted); padding: 4px 2px; }
+.coach-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.coach-pick .chip {
+  font: 500 12px "Space Grotesk", sans-serif; color: var(--text);
+  background: #ffffff08; border: 1px solid var(--line); border-radius: 999px;
+  padding: 6px 11px; cursor: pointer; transition: 0.2s;
 }
-.coach-ctx select:focus { outline: none; border-color: #ccff0055; }
+.coach-pick .chip:hover:not(:disabled) { background: #ffffff14; border-color: #ccff0044; }
+.coach-pick .chip.ghost { color: var(--muted); border-style: dashed; }
+.coach-pick .chip:disabled { opacity: 0.5; cursor: default; }
