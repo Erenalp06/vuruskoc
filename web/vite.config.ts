@@ -40,7 +40,10 @@ export default defineConfig({
       workbox: {
         // precache only the app shell; the big files are runtime-cached on first use
         globPatterns: ["**/*.{js,css,html,woff2,woff,svg}"],
-        globIgnores: ["**/mediapipe/**", "**/models/**", "**/drills/**"],
+        globIgnores: [
+          "**/mediapipe/**", "**/models/**", "**/drills/**",
+          "**/assets/webllm-*.js", // opt-in only — never ship it in the base install
+        ],
         navigateFallback: "/index.html",
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
         runtimeCaching: [
@@ -54,11 +57,35 @@ export default defineConfig({
               rangeRequests: true,
             },
           },
+          {
+            // opt-in on-device LLM runtime chunk — cache it once fetched so
+            // opted-in users keep working offline (the model shards have their
+            // own Cache API store managed by web-llm)
+            urlPattern: ({ url }) => /\/assets\/webllm-[\w-]+\.js$/.test(url.pathname),
+            handler: "CacheFirst",
+            options: {
+              cacheName: "vk-webllm-1",
+              expiration: { maxEntries: 3, maxAgeSeconds: 60 * 60 * 24 * 180 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
         ],
       },
       devOptions: { enabled: false },
     }),
   ],
+  // web-llm is large and only loaded when the user opts into the on-device model;
+  // keep it in its own predictably-named chunk so the PWA precache can skip it.
+  optimizeDeps: { exclude: ["@mlc-ai/web-llm"] },
   server: { port: 5180, proxy: { "/api": "http://127.0.0.1:8899" } },
-  build: { outDir: "dist" },
+  build: {
+    outDir: "dist",
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("@mlc-ai/web-llm")) return "webllm";
+        },
+      },
+    },
+  },
 });

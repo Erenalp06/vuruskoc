@@ -241,3 +241,89 @@ export function coachReply(input: string, ctx: CoachCtx): CoachAnswer {
 }
 
 export const COACH_STARTER_CHIPS = CHIPS_DEFAULT;
+
+// ── Faz 1: shared context for the optional on-device LLM ──────────────
+// The rule-based handlers above stay the fallback. When the on-device model
+// is active (coach/llm.ts), Coach.tsx feeds it these messages instead — same
+// retrieval, same real analysis numbers, only the wording is model-generated.
+
+export type ChatMsg = { role: "system" | "user" | "assistant"; content: string };
+
+function contextFacts(ctx: CoachCtx): string[] {
+  const r = ctx.result;
+  const f: string[] = [];
+  if (r) {
+    f.push(`Vuruş tipi: ${r.stroke}. SwingScore: ${scoreTxt(r)}.`);
+    const sum = swingSummary(r.scores ?? null, (r.contact_angles as any) ?? null,
+      r.stroke as any, (r.loading_angles as any) ?? null, "tr");
+    if (sum) f.push(`Motor özeti: ${sum}`);
+    const corr = corrections(r);
+    if (corr.length) {
+      for (const c of corr) f.push(`Öncelikli düzeltme — ${c.headline}: ${c.why} Önerilen alıştırma: ${c.drill}`);
+    } else {
+      f.push("Ölçülen açıların tümü ideal aralıkta; belirgin bir mekanik hata yok.");
+    }
+    const drills = recommendDrills(corr, r.stroke as any, allInRange(r), 3);
+    if (drills.length) f.push(`Katalogdan uygun drill'ler: ${drills.map((d) => `${d.name} (${d.equipment})`).join("; ")}.`);
+  } else {
+    f.push("Kullanıcının henüz bir vuruş analizi yok.");
+  }
+  const t = trendLine(ctx.history);
+  if (t) f.push(t);
+  const mt = metricTrend(ctx.history);
+  if (mt.length) {
+    const lo = mt[0], hi = mt[mt.length - 1];
+    if (lo.delta < -4) f.push(`Zamanla geriye giden metrik: ${METRIC_TR[lo.metric]} (${lo.delta}).`);
+    if (hi.delta > 4) f.push(`Zamanla ilerleyen metrik: ${METRIC_TR[hi.metric]} (+${hi.delta}).`);
+  }
+  return f;
+}
+
+function contextKB(input: string, ctx: CoachCtx): KBChunk[] {
+  const q = norm(input);
+  const seeds: string[] = [];
+  const add = (...ids: string[]) => seeds.push(...ids);
+  if (/forehand|forhand|fh\b/.test(q)) add("fh-common-errors", "fh-basic");
+  if (/backhand|bekhand|bh\b/.test(q)) add("bh-common-errors", "bh-basic");
+  if (/servis|serve/.test(q)) add("serve-common-errors", "serve-basic");
+  if (/(gec temas|gec kali|top arkamda|erken hazirlik)/.test(q)) add("fh-late-contact", "contact-point");
+  if (/(plan|antrenman|program)/.test(q) || /\d\s*(dk|dakika)/.test(q)) add("weekly-structure", "warmup", "consistency-first");
+  if (/(evde|raketsiz|kortsuz|sahasiz)/.test(q)) add("home-no-racket", "home-wall");
+  const r = ctx.result;
+  if (r) {
+    for (const c of corrections(r)) {
+      const m = (c.clipMetric ?? c.metric) as string;
+      const hit = KB.find((k) => (k.targets ?? []).includes(`${m}:${c.direction}`) || (k.targets ?? []).includes(m));
+      if (hit) add(hit.id);
+    }
+  }
+  const bySeed = seeds.map(kbById).filter((c): c is KBChunk => !!c);
+  const byText = kbSearch(input, 3);
+  return [...new Map([...bySeed, ...byText].map((c) => [c.id, c])).values()].slice(0, 4);
+}
+
+const SYSTEM_PROMPT = [
+  "Sen VuruşKoç uygulamasının tenis antrenörüsün. Sıcak, net ve pratik konuşursun. Sadece Türkçe yaz.",
+  "Kurallar:",
+  "1) Yalnızca sana verilen ANALİZ ve BİLGİ NOTLARI'na dayan. Bunlarda olmayan bir sayı ya da olgu uydurma; bilmiyorsan bilmediğini söyle.",
+  "2) Sayısal yorumları kullanıcının kendi ölçümlerinden yap.",
+  "3) Kısa tut: en fazla 8 cümle ya da 4-6 maddelik bir liste. Somut, uygulanabilir tavsiye ver.",
+  "4) Ağrı/sakatlık işareti varsa bir sağlık uzmanına danışmasını söyle.",
+  "5) Bu bir kamera-tabanlı tahmindir, kesin ölçüm değil — sonuçları buna göre yorumla.",
+].join("\n");
+
+export function buildCoachMessages(input: string, ctx: CoachCtx): ChatMsg[] {
+  const user = [
+    "ANALİZ:",
+    ...contextFacts(ctx).map((l) => `- ${l}`),
+    "",
+    "BİLGİ NOTLARI:",
+    ...(() => { const k = contextKB(input, ctx); return k.length ? k.map((c) => `- ${c.title}: ${c.body}`) : ["- (ilgili not yok)"]; })(),
+    "",
+    `SORU: ${input.trim()}`,
+  ].join("\n");
+  return [
+    { role: "system", content: SYSTEM_PROMPT },
+    { role: "user", content: user },
+  ];
+}
