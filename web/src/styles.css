@@ -489,3 +489,37 @@ video { width: 100%; border-radius: 12px; background: #000; display: block; }
 .run-dots i:nth-child(2) { animation-delay: 0.15s; }
 .run-dots i:nth-child(3) { animation-delay: 0.3s; }
 @keyframes pulse { 0%, 100% { opacity: 0.25; } 50% { opacity: 1; } }
+
+/* ── AI Koç (rule-based coach, Faz 0) ───────────────────────────── */
+.card.coach > h3 { display: flex; align-items: center; gap: 8px; }
+.coach-beta {
+  font: 500 10px "Space Grotesk", sans-serif; letter-spacing: 0.04em;
+  color: var(--violet); border: 1px solid #8a6cff44; border-radius: 999px;
+  padding: 2px 8px; text-transform: none;
+}
+.coach-log {
+  display: flex; flex-direction: column; gap: 10px;
+  max-height: 340px; overflow-y: auto; padding: 4px 2px 4px 0; margin-top: 4px;
+}
+.cmsg { font-size: 13px; line-height: 1.55; border-radius: 12px; padding: 9px 12px; max-width: 92%; }
+.cmsg.coach { background: var(--panel-2); border: 1px solid var(--line); color: #dbe2ec; align-self: flex-start; }
+.cmsg.user { background: #ccff0012; border: 1px solid #ccff0033; color: var(--text); align-self: flex-end; }
+.cmsg .cbul { position: relative; padding-left: 14px; margin-top: 2px; }
+.cmsg .cbul::before { content: "•"; position: absolute; left: 2px; color: var(--accent); }
+.cmsg .cbul.cbul-sub { padding-left: 26px; color: var(--muted); font-size: 12.5px; }
+.cmsg .cbul.cbul-sub::before { left: 14px; color: var(--dim); }
+.cmsg .cgap { height: 6px; }
+.coach-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.coach-chips .chip {
+  font: 500 12px "Space Grotesk", sans-serif; color: var(--text);
+  background: #ffffff08; border: 1px solid var(--line); border-radius: 999px;
+  padding: 6px 11px; cursor: pointer; transition: 0.2s;
+}
+.coach-chips .chip:hover { background: #ffffff14; border-color: #ccff0044; }
+.coach-input { display: flex; gap: 8px; margin-top: 12px; }
+.coach-input input {
+  flex: 1; background: var(--panel-2); color: var(--text);
+  border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 13px;
+}
+.coach-input input:focus { outline: none; border-color: #ccff0055; }
+.coach-note { font-size: 10.5px; color: var(--dim); line-height: 1.5; margin: 10px 0 0; }
